@@ -86,4 +86,4 @@ $ sudo service postfix restart
 
 ## ライセンス
 
-- [The MIT License (MIT)](https://github.com/tcnksm/tool/blob/master/LICENCE)
+- The MIT License (MIT)
