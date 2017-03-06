@@ -46,11 +46,11 @@ def create_callfile(trunk, extension, tif_file, basename):
 def main(trunk, extension):
     import time
     basename = str(int(time.time()))
-    pdf_files = fetch_pdfs(sys.stdin, basename)
-    tif_file = pdf2tif(list(pdf_files), basename)
+    pdf_files = list(fetch_pdfs(sys.stdin, basename))
+    tif_file = pdf2tif(pdf_files, basename)
     create_callfile(trunk, extension, tif_file, basename)
-    for path in pdf_files:
-        os.remove(path)
+    for pdf_file in pdf_files:
+        os.remove(pdf_file)
 
 if __name__ == '__main__':
     import sys
