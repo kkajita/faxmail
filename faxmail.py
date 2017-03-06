@@ -21,8 +21,8 @@ def fetch_pdfs(stream, basename):
     for i, part in enumerate(message.walk()):
         if part.get_content_type() == 'application/pdf':
             pdf_file = os.path.join(SPOOL, 'fax', basename + str(i) + '.pdf')
-            with open(pdf_file, 'w') as pdffile:
-                pdffile.write(part.get_payload(decode=True))
+            with open(pdf_file, 'w') as f:
+                f.write(part.get_payload(decode=True))
             yield pdf_file
 
 def pdf2tif(pdf_files, basename):
@@ -39,9 +39,9 @@ def pdf2tif(pdf_files, basename):
 
 def create_callfile(trunk, extension, tif_file, basename):
     """callfileを作成する。"""
-    filename = os.path.join(SPOOL, 'outgoing', basename)
-    with open(filename, 'w') as callfile:
-        callfile.write(OUTGOING.format(trunk=trunk, extension=extension, data=tif_file))
+    call_file = os.path.join(SPOOL, 'outgoing', basename)
+    with open(call_file, 'w') as f:
+        f.write(OUTGOING.format(trunk=trunk, extension=extension, data=tif_file))
 
 def main(trunk, extension):
     import time
