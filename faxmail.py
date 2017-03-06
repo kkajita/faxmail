@@ -1,12 +1,22 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+"""
+メールに添付されたPDFのイメージをFAXで送信する FAX gateway です。
+
+    Usage: faxmail.py <TRUNK名> <送信先電話番号>
+
+標準入力に，メールデータを与えます。
+"""
+
 import os
 
-SPOOL = '/var/spool/asterisk'
+PDF_DIR = '/tmp'
+TIFF_DIR = '/var/spool/asterisk/fax'
+OUTGOING_DIR = '/var/spool/asterisk/outgoing'
 GS = '/usr/bin/gs'
 
-OUTGOING = '''Channel: SIP/{extension}@{trunk}
+OUTGOING_MESSAGE = '''Channel: SIP/{extension}@{trunk}
 WaitTime: 30
 Maxretries: 3
 RetryTime: 300
@@ -20,7 +30,7 @@ def fetch_pdfs(stream, basename):
     message = email.message_from_file(stream)
     for i, part in enumerate(message.walk()):
         if part.get_content_type() == 'application/pdf':
-            pdf_file = os.path.join(SPOOL, 'fax', basename + str(i) + '.pdf')
+            pdf_file = os.path.join(PDF_DIR, basename + str(i) + '.pdf')
             with open(pdf_file, 'w') as f:
                 f.write(part.get_payload(decode=True))
             yield pdf_file
@@ -28,7 +38,7 @@ def fetch_pdfs(stream, basename):
 def pdf2tif(pdf_files, basename):
     """複数のPDFファイルを結合して，ひとつのTIFFファイルに変換する。"""
     import subprocess
-    tif_file = os.path.join(SPOOL, 'fax', basename + '.tif')
+    tif_file = os.path.join(TIFF_DIR, basename + '.tif')
     command = [
         GS, '-q', '-dNOPAUSE', '-dBATCH',
         '-sDEVICE=tiffg4', '-sPAPERSIZE=a4',
@@ -39,18 +49,20 @@ def pdf2tif(pdf_files, basename):
 
 def create_callfile(trunk, extension, tif_file, basename):
     """callfileを作成する。"""
-    call_file = os.path.join(SPOOL, 'outgoing', basename)
+    call_file = os.path.join(OUTGOING_DIR, basename)
     with open(call_file, 'w') as f:
-        f.write(OUTGOING.format(trunk=trunk, extension=extension, data=tif_file))
+        f.write(OUTGOING_MESSAGE.format(trunk=trunk, extension=extension, data=tif_file))
 
 def main(trunk, extension):
+    """
+    標準入力から読み込んだメールデータからPDFを抽出しTIFF形式に変換します。
+    AsteriskにFAX送信を指示します。
+    """
     import time
     basename = str(int(time.time()))
     pdf_files = list(fetch_pdfs(sys.stdin, basename))
     tif_file = pdf2tif(pdf_files, basename)
     create_callfile(trunk, extension, tif_file, basename)
-    for pdf_file in pdf_files:
-        os.remove(pdf_file)
 
 if __name__ == '__main__':
     import sys
