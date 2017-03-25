@@ -11,7 +11,7 @@ GS = 'gs'
 
 OUTGOING_MESSAGE = '''Channel: SIP/{faxnumber}@{trunk}
 WaitTime: 30
-MaxRetries: 3
+MaxRetries: 0
 RetryTime: 300
 Archive: yes
 Priority: 1

@@ -5,15 +5,22 @@ Asteriskを利用してFAXの送受信を行うためのスクリプトです。
 
 ## sendfax.py
 
-メールに添付されたPDFのイメージをFAXで送信する FAX gateway です。
+メールに添付されたPDFのイメージをFAXで送信します。  
 
 ### 概要
 
+- FAX gatewayとして機能します。
 - 標準入力から読み込んだメールに添付されているPDFファイルを抽出します。
 - Ghostscriptを使って，PDFをTIFF形式に変換します。
-- call fileを`/var/spool/asterisk/outgoing`ディレクトリに置き，AsteriskにFAXの送信を指示します。
+- call fileを`/var/spool/asterisk/outgoing`ディレクトリに置くことで，FAXの送信をAsteriskに指示します。
 
 ### 必要条件
+
+実行には，以下のソフトウェアが必要です。
+
+- Python
+- Ghostscript
+- Asterisk
 
 以下の環境で動作確認を取りました。
 
@@ -23,74 +30,32 @@ Asteriskを利用してFAXの送受信を行うためのスクリプトです。
 - Ghostscript 9.18
 - Asterisk 13
 
-### 使い方
-
-```
-sendfax.py <trunk名> <送信先電話番号>
-```
-
-### インストール
-#### Asterisk
+GhostscriptとAsteriskは，以下のコマンドでインストールしました。
 
 ```
 $ sudo apt install asterisk
-```
-
-Asteriskの設定については，その他のサイトを参照してください。
-
-#### Ghostscript
-
-```
 $ sudo apt install ghostscript
 ```
 
-#### faxmail.py
-
-`/usr/local/bin/`等パスの通った場所に配置してください。
-
-#### postfix
-
-`fax+<電送信先話番号>@example.co.jp`宛に届いたメールをFAXで送信するものとします。
-
-faxユーザーを認識するように`/etc/aliases`にエントリを追加します。
-```
-fax:	root
-```
-`/etc/aliases.db`を更新します。
-```
-$ sudo newaliases
-```
-
-faxmailサービスを追加します。
-```
-$ sudo vim /etc/postfix/master.cf
-
-faxmail   unix  -       n       n       -       1       pipe
-        flags=q user=asterisk argv=/usr/local/bin/faxmail.py <trun名> ${extension}
-```
-
-配送先リストファイルを追加します。
-```
-$ sudo vim /etc/postfix/main.cf
-
-transport_maps = regexp:/etc/postfix/transport.reg
-```
+### 使い方
 
 ```
-$ sudo vim /etc/postfix/transport.reg
+usage: sendfax.py [-h] context trunk number
 
-/^fax\+([-0-9]){6,11}@example.co.jp$/ faxmail:
-```
+FAX gateway for Asterisk
 
-postfixサービスを再起動します。
+positional arguments:
+  context     context name
+  trunk       SIP trunk
+  number      FAX number
 
-```
-$ sudo service postfix restart
+optional arguments:
+  -h, --help  show this help message and exit
 ```
 
 ## sendmail.py
 
-FAXの送受信結果をメールで通知するために使用するスクリプトです。
+FAXの送受信結果をメールで通知するためのスクリプトです。
 
 ### 概要
 
@@ -100,6 +65,12 @@ FAXの送受信結果をメールで通知するために使用するスクリ�
 
 ### 必要条件
 
+実行には，以下のソフトウェアが必要です。
+
+- Python
+- Postfix
+- ImageMagick
+
 以下の環境で動作確認を取りました。
 
 - Ubuntu 16.04
@@ -107,22 +78,161 @@ FAXの送受信結果をメールで通知するために使用するスクリ�
 - Postfix 3.1.0
 - ImageMagick 6.q16
 
-### 使い方
-
-```
-sendmail.py -a <添付ファイル名> ... -f <送信元アドレス> -s <サブジェクト> -b <メール本文> <送信先アドレス>
-```
-
-### インストール
-#### ImageMagick
+ImageMagickは，以下のコマンドでインストールしました。
 
 ```
 $ sudo apt install imagemagick
 ```
+### 使い方
 
-#### sendmail.py
+```
+usage: sendmail.py [-h] [-a [ATTACHMENT [ATTACHMENT ...]]] [-f FROMADDR]
+                   [-s SUBJECT] [-b BODY]
+                   toaddr
 
-`/usr/local/bin/`等パスの通った場所に配置してください。
+Send mail with attachment. However, TIFF format files are converted to PDF.
+
+positional arguments:
+  toaddr                destination address
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -a [ATTACHMENT [ATTACHMENT ...]], --attachment [ATTACHMENT [ATTACHMENT ...]]
+                        attachment files
+  -f FROMADDR, --from FROMADDR
+                        sender address
+  -s SUBJECT, --subject SUBJECT
+                        subject of the email
+  -b BODY, --body BODY  content of the email
+```
+
+## FAX受信設定
+### Asterisk
+
+Asteriskの基本的な設定については，Asteriskのマニュアルやその他のサイトを参照してください。
+
+着信時にFAXを検出するために，`sip.conf`に`faxdetect=yes`を設定してください。
+
+```ini:sip.conf
+[general]
+faxdetect=yes
+
+[trank]
+; SIP trankの設定（省略）
+```
+
+`extension.conf`では，FAX検出後のルールを追加します。
+
+受信したFAXイメージは，`TOADDR`宛にメール送信されます。
+
+```ini:extentions.conf
+[globals]
+; メール送信情報
+TOADDR=foo@example.com
+FROMADDR=fax@example.com
+
+[incoming]
+; 外線着信
+exten => trank,1,NoOp(**** INCOMING FAX ****)
+exten => trank,n,Answer()
+exten => trank,n,Goto(fax-rx,receive,1)
+
+; FAX検出
+exten => fax,1,NoOp(**** FAX DETECTED ****)
+exten => fax,n,Goto(fax-rx,receive,1)
+
+[fax-rx]
+exten => receive,1,NoOP(*** RECEIVE FAX START ***)
+exten => receive,n,Set(FAXFILE=/var/spool/asterisk/fax/${EPOCH}.tif)
+exten => receive,n,ReceiveFAX(${FAXFILE})
+exten => receive,n,Hangup
+
+exten => h,1,NoOP(*** RECEIVE FAX FINISHED ***)
+exten => h,n,System(/usr/local/bin/sendmail.py ${TOADDR} -a ${FAXFILE} -f ${FROMADDR} -s "fax received from ${CALLERID(num)}")
+```
+
+asteriskサービスを再起動します。
+
+```
+$ sudo service asterisk restart
+```
+
+## FAX送信設定
+### postfix
+
+ここでは，`fax+<電送信先話番号>@example.com`宛に届いたメールをFAXで送信するものとします。
+
+faxユーザーを認識するように，`/etc/aliases`にエントリを追加します。
+```
+fax:	root
+```
+`/etc/aliases.db`を更新します。
+```
+$ sudo newaliases
+```
+
+faxmailサービスを追加します。  
+`sendfax.py`コマンドのパス，context名，trank名は，実行環境の設定に合わせてください。
+
+```ini:/etc/postfix/master.cf
+$ sudo vim /etc/postfix/master.cf
+
+faxmail   unix  -       n       n       -       1       pipe
+        flags=q user=asterisk argv=/usr/local/bin/sendfax.py fax-tr trank ${extension}
+```
+
+`/etc/postfix/main.cf`に，配送先リストファイルを追加します。
+
+```ini:/etc/postfix/main.cf
+transport_maps = regexp:/etc/postfix/transport.reg
+```
+
+`/etc/postfix/transport.reg`に，faxmailサービスに配信すべきメールアドレスのパターンを記述します。
+
+```ini:/etc/postfix/transport.reg
+/^fax\+([-0-9]){6,11}@example.com$/ faxmail:
+```
+
+postfixサービスを再起動します。
+
+```
+$ sudo service postfix restart
+```
+
+### Asterisk
+
+`extension.conf`にFAX送信時に利用するcontext（ここでは，`fax-tr`）を追加します。
+
+FAX送信結果は，`TOADDR`宛にメールで通知されます。
+
+```ini:extentions.conf
+[globals]
+; FAXヘッダ設定
+HEADERINFO=09999999999
+LOCALSTATIONID=SOME COMPANY
+; メール送信情報
+TOADDR=foo@example.com
+FROMADDR=fax@example.com
+
+[fax-tr]
+exten => send,1,NoOP(*** SEND FAX START: File=${FAXFILE} ***)
+exten => send,n,Set(FAXFILE=${FAXFILE})
+exten => send,n,Set(FAXNUMBER=${FAXNUMBER})
+exten => send,n,Set(FAXOPT(ecm)=yes)
+exten => send,n,Set(FAXOPT(headerinfo)=${HEADERINFO})
+exten => send,n,Set(FAXOPT(localstationid)=${LOCALSTATIONID})
+exten => send,n,SendFax(${FAXFILE})
+exten => send,n,Hangup
+
+exten => h,1,NoOP(*** SEND FAX FINISHED: STATUS=${FAXSTATUS} ***)
+exten => h,n,System(/usr/local/bin/sendmail.py ${TOADDR} -a ${FAXFILE} -f ${FROMADDR} -s "fax send to ${FAXNUMBER}" -b "STATUS: ${FAXSTATUS}\nERROR: ${FAXERROR}\nPAGES: ${FAXPAGES}\nSTATIONID: ${REMOTESTATIONID}\nBITRATE: ${FAXBITRATE}\nRESOLUTION: ${FAXRESOLUTION}\n\n")
+```
+
+asteriskサービスを再起動します。
+
+```
+$ sudo service asterisk restart
+```
 
 ## ライセンス
 
