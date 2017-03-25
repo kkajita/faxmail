@@ -176,8 +176,6 @@ faxmailサービスを追加します。
 `sendfax.py`コマンドのパス，context名，trank名は，実行環境の設定に合わせてください。
 
 ```ini
-$ sudo vim /etc/postfix/master.cf
-
 faxmail   unix  -       n       n       -       1       pipe
         flags=q user=asterisk argv=/usr/local/bin/sendfax.py fax-tr trank ${extension}
 ```
