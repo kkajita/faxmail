@@ -18,10 +18,13 @@ GS = '/usr/bin/gs'
 
 OUTGOING_MESSAGE = '''Channel: SIP/{extension}@{trunk}
 WaitTime: 30
-Maxretries: 3
+MaxRetries: 3
 RetryTime: 300
-Application: SendFax
-Data: {data}
+Archive: yes
+Priority: 1
+Context: fax-tr
+Extension: send
+Set: FAXFILE={faxfile}
 '''
 
 def fetch_pdfs(stream, basename):
@@ -51,7 +54,7 @@ def create_callfile(trunk, extension, tif_file, basename):
     """callfileを作成する。"""
     call_file = os.path.join(OUTGOING_DIR, basename)
     with open(call_file, 'w') as f:
-        f.write(OUTGOING_MESSAGE.format(trunk=trunk, extension=extension, data=tif_file))
+        f.write(OUTGOING_MESSAGE.format(trunk=trunk, extension=extension, faxfile=tif_file))
 
 def main(trunk, extension):
     """
