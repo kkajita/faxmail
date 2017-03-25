@@ -9,8 +9,7 @@ Asteriskを利用してFAXの送受信を行うためのスクリプトです。
 
 ### 概要
 
-- FAX gatewayとして機能します。
-- 標準入力から読み込んだメールに添付されているPDFファイルを抽出します。
+- 標準入力から読み込んだメールメッセージに添付されているPDFを抽出します。
 - Ghostscriptを使って，PDFをTIFF形式に変換します。
 - call fileを`/var/spool/asterisk/outgoing`ディレクトリに置くことで，FAXの送信をAsteriskに指示します。
 
@@ -107,13 +106,13 @@ optional arguments:
 ```
 
 ## FAX受信設定
-### Asterisk
+### Asteriskの設定
 
 Asteriskの基本的な設定については，Asteriskのマニュアルやその他のサイトを参照してください。
 
 着信時にFAXを検出するために，`sip.conf`に`faxdetect=yes`を設定してください。
 
-```ini:sip.conf
+```ini
 [general]
 faxdetect=yes
 
@@ -125,7 +124,7 @@ faxdetect=yes
 
 受信したFAXイメージは，`TOADDR`宛にメール送信されます。
 
-```ini:extentions.conf
+```ini
 [globals]
 ; メール送信情報
 TOADDR=foo@example.com
@@ -146,7 +145,6 @@ exten => receive,1,NoOP(*** RECEIVE FAX START ***)
 exten => receive,n,Set(FAXFILE=/var/spool/asterisk/fax/${EPOCH}.tif)
 exten => receive,n,ReceiveFAX(${FAXFILE})
 exten => receive,n,Hangup
-
 exten => h,1,NoOP(*** RECEIVE FAX FINISHED ***)
 exten => h,n,System(/usr/local/bin/sendmail.py ${TOADDR} -a ${FAXFILE} -f ${FROMADDR} -s "fax received from ${CALLERID(num)}")
 ```
@@ -158,7 +156,10 @@ $ sudo service asterisk restart
 ```
 
 ## FAX送信設定
-### postfix
+
+受信したメールをFAXで送信するFAX gatewayとして構成します。  
+
+### postfixの設定
 
 ここでは，`fax+<電送信先話番号>@example.com`宛に届いたメールをFAXで送信するものとします。
 
@@ -174,7 +175,7 @@ $ sudo newaliases
 faxmailサービスを追加します。  
 `sendfax.py`コマンドのパス，context名，trank名は，実行環境の設定に合わせてください。
 
-```ini:/etc/postfix/master.cf
+```ini
 $ sudo vim /etc/postfix/master.cf
 
 faxmail   unix  -       n       n       -       1       pipe
@@ -183,13 +184,13 @@ faxmail   unix  -       n       n       -       1       pipe
 
 `/etc/postfix/main.cf`に，配送先リストファイルを追加します。
 
-```ini:/etc/postfix/main.cf
+```ini
 transport_maps = regexp:/etc/postfix/transport.reg
 ```
 
 `/etc/postfix/transport.reg`に，faxmailサービスに配信すべきメールアドレスのパターンを記述します。
 
-```ini:/etc/postfix/transport.reg
+```ini
 /^fax\+([-0-9]){6,11}@example.com$/ faxmail:
 ```
 
@@ -199,13 +200,13 @@ postfixサービスを再起動します。
 $ sudo service postfix restart
 ```
 
-### Asterisk
+### Asteriskの設定
 
 `extension.conf`にFAX送信時に利用するcontext（ここでは，`fax-tr`）を追加します。
 
 FAX送信結果は，`TOADDR`宛にメールで通知されます。
 
-```ini:extentions.conf
+```ini
 [globals]
 ; FAXヘッダ設定
 HEADERINFO=09999999999
@@ -223,7 +224,6 @@ exten => send,n,Set(FAXOPT(headerinfo)=${HEADERINFO})
 exten => send,n,Set(FAXOPT(localstationid)=${LOCALSTATIONID})
 exten => send,n,SendFax(${FAXFILE})
 exten => send,n,Hangup
-
 exten => h,1,NoOP(*** SEND FAX FINISHED: STATUS=${FAXSTATUS} ***)
 exten => h,n,System(/usr/local/bin/sendmail.py ${TOADDR} -a ${FAXFILE} -f ${FROMADDR} -s "fax send to ${FAXNUMBER}" -b "STATUS: ${FAXSTATUS}\nERROR: ${FAXERROR}\nPAGES: ${FAXPAGES}\nSTATIONID: ${REMOTESTATIONID}\nBITRATE: ${FAXBITRATE}\nRESOLUTION: ${FAXRESOLUTION}\n\n")
 ```
