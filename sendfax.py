@@ -16,7 +16,7 @@ TIFF_DIR = '/var/spool/asterisk/fax'
 OUTGOING_DIR = '/var/spool/asterisk/outgoing'
 GS = 'gs'
 
-OUTGOING_MESSAGE = '''Channel: SIP/{extension}@{trunk}
+OUTGOING_MESSAGE = '''Channel: SIP/{faxnumber}@{trunk}
 WaitTime: 30
 MaxRetries: 3
 RetryTime: 300
@@ -25,6 +25,7 @@ Priority: 1
 Context: {context}
 Extension: send
 Set: FAXFILE={faxfile}
+Set: FAXNUMBER={faxnumber}
 '''
 
 def fetch_pdfs(stream, basename):
@@ -50,13 +51,13 @@ def pdf2tif(pdf_files, basename):
     proc.communicate()
     return tif_file
 
-def create_callfile(context, trunk, extension, tif_file, basename):
+def create_callfile(context, trunk, faxnumber, tif_file, basename):
     """callfileを作成する。"""
     call_file = os.path.join(OUTGOING_DIR, basename)
     with open(call_file, 'w') as f:
-        f.write(OUTGOING_MESSAGE.format(context=context, trunk=trunk, extension=extension, faxfile=tif_file))
+        f.write(OUTGOING_MESSAGE.format(context=context, trunk=trunk, faxnumber=faxnumber, faxfile=tif_file))
 
-def main(context, trunk, extension):
+def main(context, trunk, faxnumber):
     """
     標準入力から読み込んだメールデータからPDFを抽出しTIFF形式に変換します。
     AsteriskにFAX送信を指示します。
@@ -65,7 +66,7 @@ def main(context, trunk, extension):
     basename = str(int(time.time()))
     pdf_files = list(fetch_pdfs(sys.stdin, basename))
     tif_file = pdf2tif(pdf_files, basename)
-    create_callfile(context, trunk, extension, tif_file, basename)
+    create_callfile(context, trunk, faxnumber, tif_file, basename)
 
 if __name__ == '__main__':
     import sys
