@@ -1,15 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""
-メールに添付されたPDFのイメージをFAXで送信する FAX gateway です。
-
-    Usage: faxmail.py <CONTEXT名> <TRUNK名> <送信先電話番号>
-
-標準入力に，メールデータを与えます。
-"""
-
 import os
+import argparse
 
 PDF_DIR = '/tmp'
 TIFF_DIR = '/var/spool/asterisk/fax'
@@ -28,8 +21,7 @@ Set: FAXFILE={faxfile}
 Set: FAXNUMBER={faxnumber}
 '''
 
-def fetch_pdfs(stream, basename):
-    """メールに添付されているPDFを抽出してファイルとして書き出す。"""
+def extract_pdfs(stream, basename):
     import email
     message = email.message_from_file(stream)
     for i, part in enumerate(message.walk()):
@@ -39,8 +31,7 @@ def fetch_pdfs(stream, basename):
                 f.write(part.get_payload(decode=True))
             yield pdf_file
 
-def pdf2tif(pdf_files, basename):
-    """複数のPDFファイルを結合して，ひとつのTIFFファイルに変換する。"""
+def pdfs2tif(pdf_files, basename):
     import subprocess
     tif_file = os.path.join(TIFF_DIR, basename + '.tif')
     command = [
@@ -52,22 +43,22 @@ def pdf2tif(pdf_files, basename):
     return tif_file
 
 def create_callfile(context, trunk, faxnumber, tif_file, basename):
-    """callfileを作成する。"""
     call_file = os.path.join(OUTGOING_DIR, basename)
     with open(call_file, 'w') as f:
         f.write(OUTGOING_MESSAGE.format(context=context, trunk=trunk, faxnumber=faxnumber, faxfile=tif_file))
 
 def main(context, trunk, faxnumber):
-    """
-    標準入力から読み込んだメールデータからPDFを抽出しTIFF形式に変換します。
-    AsteriskにFAX送信を指示します。
-    """
     import time
+    import sys
     basename = str(int(time.time()))
-    pdf_files = list(fetch_pdfs(sys.stdin, basename))
-    tif_file = pdf2tif(pdf_files, basename)
+    pdf_files = list(extract_pdfs(sys.stdin, basename))
+    tif_file = pdfs2tif(pdf_files, basename)
     create_callfile(context, trunk, faxnumber, tif_file, basename)
 
 if __name__ == '__main__':
-    import sys
-    main(sys.argv[1], sys.argv[2], sys.argv[3])
+    par = argparse.ArgumentParser(description="FAX gateway for Asterisk")
+    par.add_argument('context', help='context name')
+    par.add_argument('trunk', help='SIP trunk')
+    par.add_argument('number', help='FAX number')
+    args = par.parse_args()
+    main(args.context, args.trunk, args.number)

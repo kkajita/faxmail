@@ -59,7 +59,7 @@ def send_mail(fromaddr, toaddr, message):
     smtp.sendmail(fromaddr, [toaddr], message)
     smtp.close()
 
-def main():
+if __name__ == '__main__':
     par = argparse.ArgumentParser(description=DESCRIPTION)
     par.add_argument('toaddr', help='destination address')
     par.add_argument('-a', '--attachment', nargs='*', default=[], help='attachment files')
@@ -70,6 +70,3 @@ def main():
     message = create_message(args.fromaddr, args.toaddr,
                              args.subject, args.body.decode('string-escape'), args.attachment)
     send_mail(args.fromaddr, args.toaddr, message)
-
-if __name__ == '__main__':
-    main()
