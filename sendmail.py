@@ -62,10 +62,10 @@ def send_mail(fromaddr, toaddr, message):
 def main():
     par = argparse.ArgumentParser(description=DESCRIPTION)
     par.add_argument('toaddr', help='destination address')
-    par.add_argument('-a', '--attachment', nargs='*', help='attachment files')
-    par.add_argument('-f', '--from', help='sender address', dest='fromaddr')
-    par.add_argument('-s', '--subject', help='subject of the email')
-    par.add_argument('-b', '--body', help='content of the email')
+    par.add_argument('-a', '--attachment', nargs='*', default=[], help='attachment files')
+    par.add_argument('-f', '--from', default='noreply@example.com', help='sender address', dest='fromaddr')
+    par.add_argument('-s', '--subject', default='', help='subject of the email')
+    par.add_argument('-b', '--body', default='', help='content of the email')
     args = par.parse_args()
     message = create_message(args.fromaddr, args.toaddr,
                              args.subject, args.body.decode('string-escape'), args.attachment)
