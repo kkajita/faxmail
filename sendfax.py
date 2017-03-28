@@ -3,6 +3,7 @@
 
 import os
 import argparse
+import email
 
 PDF_DIR = '/tmp'
 TIFF_DIR = '/var/spool/asterisk/fax'
@@ -11,19 +12,17 @@ GS = 'gs'
 
 OUTGOING_MESSAGE = '''Channel: SIP/{faxnumber}@{trunk}
 WaitTime: 30
-MaxRetries: 0
+MaxRetries: 2
 RetryTime: 300
 Archive: yes
-Priority: 1
 Context: {context}
 Extension: send
+Priority: 1
 Set: FAXFILE={faxfile}
 Set: FAXNUMBER={faxnumber}
 '''
 
-def extract_pdfs(stream, basename):
-    import email
-    message = email.message_from_file(stream)
+def extract_pdfs(message, basename):
     for i, part in enumerate(message.walk()):
         if part.get_content_type() == 'application/pdf':
             pdf_file = os.path.join(PDF_DIR, basename + str(i) + '.pdf')
@@ -42,18 +41,19 @@ def pdfs2tif(pdf_files, basename):
     proc.communicate()
     return tif_file
 
-def create_callfile(context, trunk, faxnumber, tif_file, basename):
-    call_file = os.path.join(OUTGOING_DIR, basename)
+def create_callfile(basename, **params):
+    call_file = os.path.join(OUTGOING_DIR, basename + '.call')
     with open(call_file, 'w') as f:
-        f.write(OUTGOING_MESSAGE.format(context=context, trunk=trunk, faxnumber=faxnumber, faxfile=tif_file))
+        f.write(OUTGOING_MESSAGE.format(**params))
 
 def main(context, trunk, faxnumber):
     import time
     import sys
     basename = str(int(time.time()))
-    pdf_files = list(extract_pdfs(sys.stdin, basename))
+    message = email.message_from_file(sys.stdin)
+    pdf_files = list(extract_pdfs(message, basename))
     tif_file = pdfs2tif(pdf_files, basename)
-    create_callfile(context, trunk, faxnumber, tif_file, basename)
+    create_callfile(basename, context=context, trunk=trunk, faxnumber=faxnumber, faxfile=tif_file)
 
 if __name__ == '__main__':
     par = argparse.ArgumentParser(description="FAX gateway for Asterisk")
