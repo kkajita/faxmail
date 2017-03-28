@@ -9,9 +9,10 @@ Asteriskを利用してFAXの送受信を行うためのスクリプトです。
 
 ### 概要
 
-- 標準入力から読み込んだメールメッセージに添付されているPDFを抽出します。
-- Ghostscriptを使って，PDFをTIFF形式に変換します。
-- call fileを`/var/spool/asterisk/outgoing`ディレクトリに置くことで，FAXの送信をAsteriskに指示します。
+- Ghostscriptを使って，メールから抽出したPDFをTIFF形式ファイルに変換します。
+- `/var/spool/asterisk/outgoing`ディレクトリにcall fileを置くことで，
+  AsteriskにFAXの送信を指示します。
+- 本文のテキストは無視します。
 
 ### 必要条件
 
@@ -51,6 +52,11 @@ positional arguments:
 optional arguments:
   -h, --help  show this help message and exit
 ```
+
+- メールメッセージは，標準入力から与えられるものとします。
+- contextに，`extension.conf`で定義したコンテキスト名を指定します。
+- trunkには，`sip.conf`で定義した接続先のセクション名を指定します。
+- numberで，送信先の電話番号を指定します。
 
 ## sendmail.py
 
@@ -104,6 +110,8 @@ optional arguments:
                         subject of the email
   -b BODY, --body BODY  content of the email
 ```
+
+- BODYでは，エスケープシーケンス（'\n'等）が展開されます。
 
 ## FAX受信設定
 ### Asteriskの設定
@@ -172,8 +180,9 @@ fax:	root
 $ sudo newaliases
 ```
 
-faxmailサービスを追加します。  
-`sendfax.py`コマンドのパス，context名，trank名は，実行環境の設定に合わせてください。
+faxmailサービスを追加します。
+- userは，Asteriskサービスの実行ユーザに合わせてください。
+- `sendfax.py`コマンドのパス，context名，trank名は，実行環境の設定に合わせてください。
 
 ```ini
 faxmail   unix  -       n       n       -       1       pipe
@@ -202,28 +211,38 @@ $ sudo service postfix restart
 
 `extension.conf`にFAX送信時に利用するcontext（ここでは，`fax-tr`）を追加します。
 
+送信先が応答しない場合は，リトライします（５分間隔，最大2回）。  
+ただし，着信自体は成功したがFAXのデータ送信に失敗した場合にはリトライしません。
+
 FAX送信結果は，`TOADDR`宛にメールで通知されます。
 
 ```ini
 [globals]
 ; FAXヘッダ設定
-HEADERINFO=09999999999
-LOCALSTATIONID=SOME COMPANY
+HEADERINFO=SOME COMPANY
+LOCALSTATIONID=09999999999
 ; メール送信情報
 TOADDR=foo@example.com
 FROMADDR=fax@example.com
 
 [fax-tr]
 exten => send,1,NoOP(*** SEND FAX START: File=${FAXFILE} ***)
-exten => send,n,Set(FAXFILE=${FAXFILE})
-exten => send,n,Set(FAXNUMBER=${FAXNUMBER})
 exten => send,n,Set(FAXOPT(ecm)=yes)
 exten => send,n,Set(FAXOPT(headerinfo)=${HEADERINFO})
 exten => send,n,Set(FAXOPT(localstationid)=${LOCALSTATIONID})
 exten => send,n,SendFax(${FAXFILE})
 exten => send,n,Hangup
+
+exten => failed,1,Set(FAXSTATUS=DIALFAIL)
+exten => failed,n,Set(FAXERROR=No Answer)
+exten => failed,n,Set(FAXPAGES=0)
+exten => failed,n,Hangup
+
 exten => h,1,NoOP(*** SEND FAX FINISHED: STATUS=${FAXSTATUS} ***)
-exten => h,n,System(/usr/local/bin/sendmail.py ${TOADDR} -a ${FAXFILE} -f ${FROMADDR} -s "fax send to ${FAXNUMBER}" -b "STATUS: ${FAXSTATUS}\nERROR: ${FAXERROR}\nPAGES: ${FAXPAGES}\nSTATIONID: ${REMOTESTATIONID}\nBITRATE: ${FAXBITRATE}\nRESOLUTION: ${FAXRESOLUTION}\n\n")
+exten => h,n,GotoIf($["${FAXSTATUS}" != "SUCCESS"]?failed)
+exten => h,n,System(/usr/local/bin/sendmail.py ${TOADDR} -a ${FAXFILE} -f ${FROMADDR} -s "[SUCCESS] Send FAX to ${FAXNUMBER}" -b "STATUS: ${FAXSTATUS}\nPAGES: ${FAXPAGES}\nBITRATE: ${FAXBITRATE}\nRESOLUTION: ${FAXRESOLUTION}\n\n")
+exten => h,n,Hangup
+exten => h,n(failed),System(/usr/local/bin/sendmail.py ${TOADDR} -a ${FAXFILE} -f ${FROMADDR} -s "[FAILED] Send FAX to ${FAXNUMBER}" -b "STATUS: ${FAXSTATUS}\nERROR: ${FAXERROR}\n\n")
 ```
 
 asteriskサービスを再起動します。
