@@ -118,19 +118,22 @@ optional arguments:
 
 Asteriskの基本的な設定については，Asteriskのマニュアルやその他のサイトを参照してください。
 
-着信時にFAXを検出するために，`sip.conf`に`faxdetect=yes`を設定してください。
+`sip.conf`では，着信時にFAXを検出できるように`faxdetect=yes`を設定してください。
 
 ```ini
 [general]
 faxdetect=yes
 
-[trank]
-; SIP trankの設定（省略）
+[trunk]
+; SIP trunkの設定（省略）
 ```
 
-`extension.conf`では，FAX検出後のルールを追加します。
+`extension.conf`の設定例を以下に示します。
 
-受信したFAXイメージは，`TOADDR`宛にメール送信されます。
+- 外線に着信するとボイスメールが応答します。
+- FAXの発信音を検出した場合，`fax`というextenにジャンプします。
+- FAX受信用context（`[fax-rx]`）では，保存先ファイル名を指定してReceiveFAXを実行します。
+- 受信したFAXイメージファイルを，`TOADDR`宛にメール送信します。
 
 ```ini
 [globals]
@@ -140,9 +143,11 @@ FROMADDR=fax@example.com
 
 [incoming]
 ; 外線着信
-exten => trank,1,NoOp(**** INCOMING FAX ****)
-exten => trank,n,Answer()
-exten => trank,n,Goto(fax-rx,receive,1)
+exten => trunk,1,NoOp(**** INCOMING FAX ****)
+exten => trunk,n,Answer()
+exten => trunk,n,Wait(1)
+exten => trunk,n,VoiceMail(200)
+exten => trunk,n,Hangup
 
 ; FAX検出
 exten => fax,1,NoOp(**** FAX DETECTED ****)
@@ -182,11 +187,11 @@ $ sudo newaliases
 
 faxmailサービスを追加します。
 - userは，Asteriskサービスの実行ユーザに合わせてください。
-- `sendfax.py`コマンドのパス，context名，trank名は，実行環境の設定に合わせてください。
+- `sendfax.py`コマンドのパス，context名，trunk名は，実行環境の設定に合わせてください。
 
 ```ini
 faxmail   unix  -       n       n       -       1       pipe
-        flags=q user=asterisk argv=/usr/local/bin/sendfax.py fax-tr trank ${extension}
+        flags=q user=asterisk argv=/usr/local/bin/sendfax.py fax-tr trunk ${extension}
 ```
 
 `/etc/postfix/main.cf`に，配送先リストファイルを追加します。
@@ -209,12 +214,11 @@ $ sudo service postfix restart
 
 ### Asteriskの設定
 
-`extension.conf`にFAX送信時に利用するcontext（ここでは，`fax-tr`）を追加します。
+`extension.conf`にFAX送信時に利用するcontext（`[fax-tr]`）を追加します。
 
-送信先が応答しない場合は，リトライします（５分間隔，最大2回）。  
-ただし，着信自体は成功したがFAXのデータ送信に失敗した場合にはリトライしません。
-
-FAX送信結果は，`TOADDR`宛にメールで通知されます。
+- 送信先が応答しない場合は，リトライします（５分間隔，最大2回）。  
+  - ただし，着信自体は成功したがFAXのデータ送信に失敗した場合にはリトライしません。
+- FAX送信結果は，`TOADDR`宛にメールで通知されます。
 
 ```ini
 [globals]
