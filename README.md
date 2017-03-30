@@ -1,13 +1,20 @@
 faxmail
 =======
 
-Asteriskを利用してFAXの送受信を行うためのスクリプトです。
+PBXソフトウェアAsteriskを，FAXと電子メールのgatewayとして構成するためのスクリプトです。  
+
+## 概要
+
+以下が可能になります。
+- 受信したFAXをメールで転送
+  - FAXイメージは，PDF形式で添付されます。
+- メール経由でFAXを送信
+  - 送信先電話番号は，メールアドレスの一部（例：`fax+<送信先電話番号>@example.com`）を使って指示します。
+  - メールに添付されたPDFをFAXで送信します。
 
 ## sendfax.py
 
 メールに添付されたPDFのイメージをFAXで送信します。  
-
-### 概要
 
 - Ghostscriptを使って，メールから抽出したPDFをTIFF形式ファイルに変換します。
 - `/var/spool/asterisk/outgoing`ディレクトリにcall fileを置くことで，
@@ -61,8 +68,6 @@ optional arguments:
 ## sendmail.py
 
 FAXの送受信結果をメールで通知するためのスクリプトです。
-
-### 概要
 
 - ファイルを添付したメールを送信できます。
 - 添付ファイルがTIFF形式の場合は，PDFに変換します。
@@ -169,12 +174,9 @@ $ sudo service asterisk restart
 ```
 
 ## FAX送信設定
-
-受信したメールをFAXで送信するFAX gatewayとして構成します。  
-
 ### postfixの設定
 
-ここでは，`fax+<電送信先話番号>@example.com`宛に届いたメールをFAXで送信するものとします。
+ここでは，`fax+<送信先電話番号>@example.com`宛に届いたメールをFAXで送信するものとします。
 
 faxユーザーを認識するように，`/etc/aliases`にエントリを追加します。
 ```
