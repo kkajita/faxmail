@@ -9,6 +9,9 @@ PDF_DIR = '/tmp'
 TIFF_DIR = '/var/spool/asterisk/fax'
 OUTGOING_DIR = '/var/spool/asterisk/outgoing'
 GS = 'gs'
+#RESOLUTION = '204x98'
+RESOLUTION = '204x196'
+#RESOLUTION = '204x392'
 
 OUTGOING_MESSAGE = '''Channel: SIP/{faxnumber}@{trunk}
 WaitTime: 30
@@ -35,7 +38,7 @@ def pdfs2tif(pdf_files, basename):
     tif_file = os.path.join(TIFF_DIR, basename + '.tif')
     command = [
         GS, '-q', '-dNOPAUSE', '-dBATCH',
-        '-sDEVICE=tiffg4', '-sPAPERSIZE=a4',
+        '-sDEVICE=tiffg3', '-sPAPERSIZE=a4', '-dFIXEDMEDIA', '-dPDFFitPage', '-r'+RESOLUTION,
         '-sOutputFile='+tif_file] + pdf_files
     proc = subprocess.Popen(command)
     proc.communicate()
