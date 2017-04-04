@@ -48,6 +48,7 @@ def create_message(fromaddr, toaddr, subject, message, attachments):
     msg['Message-ID'] = utils.make_msgid()
     msg.attach(MIMEText(message, _subtype='plain'))
     for attachment in attachments:
+	if not os.access(attachment, os.R_OK): continue
         mimetype, _ = mimetypes.guess_type(attachment)
         if mimetype == "image/tiff":
             attachment = tif2pdf(attachment)

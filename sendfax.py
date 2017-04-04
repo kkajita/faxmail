@@ -23,6 +23,8 @@ Extension: send
 Priority: 1
 Set: FAXFILE={faxfile}
 Set: FAXNUMBER={faxnumber}
+Set: REPLYTO={replyto}
+Set: SUBJECT={subject}
 '''
 
 def extract_pdfs(message, basename):
@@ -54,9 +56,12 @@ def main(context, trunk, faxnumber):
     import sys
     basename = str(int(time.time()))
     message = email.message_from_file(sys.stdin)
+    replyto = message.get('Reply-To', message['From'])
+    subject = message['Subject'] if message['Subject'] else 'Send Fax to ' + faxnumber
     pdf_files = list(extract_pdfs(message, basename))
-    tif_file = pdfs2tif(pdf_files, basename)
-    create_callfile(basename, context=context, trunk=trunk, faxnumber=faxnumber, faxfile=tif_file)
+    tif_file = pdfs2tif(pdf_files, basename) if pdf_files else 'EMPTY.tif'
+    create_callfile(basename, context=context, trunk=trunk, faxnumber=faxnumber,
+                    faxfile=tif_file, replyto=replyto, subject=subject)
 
 if __name__ == '__main__':
     par = argparse.ArgumentParser(description="FAX gateway for Asterisk")
