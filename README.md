@@ -205,7 +205,7 @@ transport_maps = regexp:/etc/postfix/transport.reg
 `/etc/postfix/transport.reg`に，faxmailサービスに配信すべきメールアドレスのパターンを記述します。
 
 ```ini
-/^fax\+([-0-9]){6,11}@example.com$/ faxmail:
+/^fax\+([0-9]){10,11}(@.+)?$/ faxmail:
 ```
 
 postfixサービスを再起動します。
@@ -256,6 +256,14 @@ asteriskサービスを再起動します。
 ```
 $ sudo service asterisk restart
 ```
+
+### セキュリティについて
+
+FAX送信サービスの宛先（`fax+<送信先電話番号>@example.com`）を知られてしまうと誰でも利用できてしまうので注意しましょう。
+
+セキュリティを強化するには，以下のような対策が考えられます。
+- 宛先名（`fax`）を類推しにくい名前にする。
+- 送信元をホワイトリスト等で制限する。
 
 ## ライセンス
 
