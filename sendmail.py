@@ -43,7 +43,8 @@ def create_message(fromaddr, toaddr, ccaddr, subject, message, attachments):
     msg = MIMEMultipart()
     msg['To'] = toaddr
     msg['From'] = fromaddr
-    msg['Cc'] = ccaddr
+    if ccaddr:
+	msg['Cc'] = ccaddr
     msg['Subject'] = subject
     msg['Date'] = utils.formatdate(localtime=True)
     msg['Message-ID'] = utils.make_msgid()
@@ -56,9 +57,9 @@ def create_message(fromaddr, toaddr, ccaddr, subject, message, attachments):
         msg.attach(attach_file(attachment))
     return msg.as_string()
 
-def send_mail(fromaddr, toaddr, message):
+def send_mail(fromaddr, toaddr, ccaddr, message):
     smtp = smtplib.SMTP(host=SMTP_HOST, port=SMTP_PORT)
-    smtp.sendmail(fromaddr, [toaddr], message)
+    smtp.sendmail(fromaddr, [toaddr, ccaddr], message)
     smtp.close()
 
 if __name__ == '__main__':
@@ -72,4 +73,4 @@ if __name__ == '__main__':
     args = par.parse_args()
     message = create_message(args.fromaddr, args.toaddr, args.ccaddr,
                              args.subject, args.body.decode('string-escape'), args.attachment)
-    send_mail(args.fromaddr, args.toaddr, message)
+    send_mail(args.fromaddr, args.toaddr, args.ccaddr, message)
