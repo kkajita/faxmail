@@ -19,6 +19,7 @@ PBXソフトウェアAsteriskを，FAXと電子メールのgatewayとして構�
 - Ghostscriptを使って，メールから抽出したPDFをTIFF形式ファイルに変換します。
 - `/var/spool/asterisk/outgoing`ディレクトリにcall fileを置くことで，
   AsteriskにFAXの送信を指示します。
+- メールヘッダから送信元（Reply-ToまたはFrom），件名（Subject）を抽出し，Asterisk側へ受け渡します。
 - 本文のテキストは無視します。
 
 ### 必要条件
@@ -143,8 +144,7 @@ faxdetect=yes
 ```ini
 [globals]
 ; メール送信情報
-TOADDR=foo@example.com
-FROMADDR=fax@example.com
+FROMADDR=Fax Agent <fax@example.com>
 
 [incoming]
 ; 外線着信
@@ -178,7 +178,7 @@ $ sudo service asterisk restart
 
 ここでは，`fax+<送信先電話番号>@example.com`宛に届いたメールをFAXで送信するものとします。
 
-faxユーザーを認識するように，`/etc/aliases`にエントリを追加します。
+Postfixがfaxユーザーを認識するように，`/etc/aliases`にエントリを追加します。
 ```
 fax:	root
 ```
@@ -220,7 +220,7 @@ $ sudo service postfix restart
 
 - 送信先が応答しない場合は，リトライします（５分間隔，最大2回）。  
   - ただし，着信自体は成功したがFAXのデータ送信に失敗した場合にはリトライしません。
-- FAX送信結果は，`TOADDR`宛にメールで通知されます。
+- FAX送信結果は，メール送信元へ通知されます。
 
 ```ini
 [globals]
@@ -228,8 +228,7 @@ $ sudo service postfix restart
 HEADERINFO=SOME COMPANY
 LOCALSTATIONID=09999999999
 ; メール送信情報
-TOADDR=foo@example.com
-FROMADDR=fax@example.com
+FROMADDR=Fax Agent <fax@example.com>
 
 [fax-tr]
 exten => send,1,NoOP(*** SEND FAX START: File=${FAXFILE} ***)
@@ -246,9 +245,10 @@ exten => failed,n,Hangup
 
 exten => h,1,NoOP(*** SEND FAX FINISHED: STATUS=${FAXSTATUS} ***)
 exten => h,n,GotoIf($["${FAXSTATUS}" != "SUCCESS"]?failed)
-exten => h,n,System(/usr/local/bin/sendmail.py ${TOADDR} -a ${FAXFILE} -f ${FROMADDR} -s "[SUCCESS] Send FAX to ${FAXNUMBER}" -b "STATUS: ${FAXSTATUS}\nPAGES: ${FAXPAGES}\nBITRATE: ${FAXBITRATE}\nRESOLUTION: ${FAXRESOLUTION}\n\n")
+exten => h,n,System(/usr/local/bin/sendmail.py "${REPLYTO}" -a "${FAXFILE}" -f "${FROMADDR}" -s "[SUCCESS] ${SUBJECT}" -b "FAXNUMBER: ${FAXNUMBER}\nSTATUS: ${FAXSTATUS}\nPAGES: ${FAXPAGES}\nBITRATE: ${FAXBITRATE}\nRESOLUTION: ${FAXRESOLUTION}\n\n")
 exten => h,n,Hangup
-exten => h,n(failed),System(/usr/local/bin/sendmail.py ${TOADDR} -a ${FAXFILE} -f ${FROMADDR} -s "[FAILED] Send FAX to ${FAXNUMBER}" -b "STATUS: ${FAXSTATUS}\nERROR: ${FAXERROR}\n\n")
+exten => h,n(failed),System(/usr/local/bin/sendmail.py "${REPLYTO}" -a "${FAXFILE}" -f "${FROMADDR}" -s "[FAILED] ${SUBJECT}" -b "FAXNUMBER: ${FAXNUMBER}\nSTATUS: ${FAXSTATUS}\nERROR: ${FAXERROR}\n\n")
+
 ```
 
 asteriskサービスを再起動します。
@@ -257,11 +257,11 @@ asteriskサービスを再起動します。
 $ sudo service asterisk restart
 ```
 
-### セキュリティについて
+### セキュリティ対策について
 
-FAX送信サービスの宛先（`fax+<送信先電話番号>@example.com`）を知られてしまうと誰でも利用できてしまうので注意しましょう。
+上記設定では，FAX送信サービスの宛先を知られてしまうと誰でも利用できる状態となります。
+実運用時には，以下のようなセキュリティ対策を実施してください。
 
-セキュリティを強化するには，以下のような対策が考えられます。
 - 宛先名（`fax`）を類推しにくい名前にする。
 - 送信元をホワイトリスト等で制限する。
 
