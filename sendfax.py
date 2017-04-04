@@ -59,7 +59,7 @@ def main(context, trunk, faxnumber):
     replyto = message.get('Reply-To', message['From'])
     subject = message['Subject'] if message['Subject'] else 'Send Fax to ' + faxnumber
     pdf_files = list(extract_pdfs(message, basename))
-    tif_file = pdfs2tif(pdf_files, basename) if pdf_files else 'EMPTY.tif'
+    tif_file = pdfs2tif(pdf_files, basename) if pdf_files else '<<EMPTY>>'
     create_callfile(basename, context=context, trunk=trunk, faxnumber=faxnumber,
                     faxfile=tif_file, replyto=replyto, subject=subject)
 

@@ -39,10 +39,11 @@ def tif2pdf(tif_file):
     proc.communicate()
     return pdf_file
 
-def create_message(fromaddr, toaddr, subject, message, attachments):
+def create_message(fromaddr, toaddr, ccaddr, subject, message, attachments):
     msg = MIMEMultipart()
     msg['To'] = toaddr
     msg['From'] = fromaddr
+    msg['Cc'] = ccaddr
     msg['Subject'] = subject
     msg['Date'] = utils.formatdate(localtime=True)
     msg['Message-ID'] = utils.make_msgid()
@@ -65,9 +66,10 @@ if __name__ == '__main__':
     par.add_argument('toaddr', help='destination address')
     par.add_argument('-a', '--attachment', nargs='*', default=[], help='attachment files')
     par.add_argument('-f', '--from', default='noreply@example.com', help='sender address', dest='fromaddr')
+    par.add_argument('-c', '--cc', default='', help='carbon copy address', dest='ccaddr')
     par.add_argument('-s', '--subject', default='', help='subject of the email')
     par.add_argument('-b', '--body', default='', help='content of the email')
     args = par.parse_args()
-    message = create_message(args.fromaddr, args.toaddr,
+    message = create_message(args.fromaddr, args.toaddr, args.ccaddr,
                              args.subject, args.body.decode('string-escape'), args.attachment)
     send_mail(args.fromaddr, args.toaddr, message)

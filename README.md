@@ -98,7 +98,7 @@ $ sudo apt install imagemagick
 
 ```
 usage: sendmail.py [-h] [-a [ATTACHMENT [ATTACHMENT ...]]] [-f FROMADDR]
-                   [-s SUBJECT] [-b BODY]
+                   [-c CCADDR] [-s SUBJECT] [-b BODY]
                    toaddr
 
 Send mail with attachment. However, TIFF format files are converted to PDF.
@@ -112,6 +112,8 @@ optional arguments:
                         attachment files
   -f FROMADDR, --from FROMADDR
                         sender address
+  -c CCADDR, --cc CCADDR
+                        carbon copy address
   -s SUBJECT, --subject SUBJECT
                         subject of the email
   -b BODY, --body BODY  content of the email
@@ -263,7 +265,8 @@ $ sudo service asterisk restart
 実運用時には，以下のようなセキュリティ対策を実施してください。
 
 - 宛先名（`fax`）を類推しにくい名前にする。
-- 送信元をホワイトリスト等で制限する。
+- 送信結果メールに管理者へのCCを付けて監視する。
+- 送信元をホワイトリストで制限する。
 
 ## ライセンス
 
