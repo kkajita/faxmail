@@ -146,6 +146,7 @@ faxdetect=yes
 ```ini
 [globals]
 ; メール送信情報
+TOADDR=info@example.com
 FROMADDR=Fax Agent <fax@example.com>
 
 [incoming]
@@ -165,8 +166,12 @@ exten => receive,1,NoOP(*** RECEIVE FAX START ***)
 exten => receive,n,Set(FAXFILE=/var/spool/asterisk/fax/${EPOCH}.tif)
 exten => receive,n,ReceiveFAX(${FAXFILE})
 exten => receive,n,Hangup
-exten => h,1,NoOP(*** RECEIVE FAX FINISHED ***)
-exten => h,n,System(/usr/local/bin/sendmail.py ${TOADDR} -a ${FAXFILE} -f ${FROMADDR} -s "fax received from ${CALLERID(num)}")
+
+exten => h,1,NoOP(*** RECEIVE FAX FINISHED: STATUS=${FAXSTATUS} ***)
+exten => h,n,GotoIf($["${FAXSTATUS}" != "SUCCESS"]?failed)
+exten => h,n,System(/usr/local/bin/sendmail.py ${TOADDR} -f "${FROMADDR}" -a ${FAXFILE} -s "Fax Received from ${CALLERID(num)}")
+exten => h,n,Hangup
+exten => h,n(failed),System(/usr/local/bin/sendmail.py "${TOADDR}" -f "${FROMADDR}" -a ${FAXFILE} -s "[FAILED] Fax Received from ${CALLERID(num)}" -b "STATUS: ${FAXSTATUS}\nERROR: ${FAXERROR}\n\n")
 ```
 
 asteriskサービスを再起動します。
@@ -247,7 +252,7 @@ exten => failed,n,Hangup
 
 exten => h,1,NoOP(*** SEND FAX FINISHED: STATUS=${FAXSTATUS} ***)
 exten => h,n,GotoIf($["${FAXSTATUS}" != "SUCCESS"]?failed)
-exten => h,n,System(/usr/local/bin/sendmail.py "${REPLYTO}" -a "${FAXFILE}" -f "${FROMADDR}" -s "[SUCCESS] ${SUBJECT}" -b "FAXNUMBER: ${FAXNUMBER}\nSTATUS: ${FAXSTATUS}\nPAGES: ${FAXPAGES}\nBITRATE: ${FAXBITRATE}\nRESOLUTION: ${FAXRESOLUTION}\n\n")
+exten => h,n,System(/usr/local/bin/sendmail.py "${REPLYTO}" -a "${FAXFILE}" -f "${FROMADDR}" -s "${SUBJECT}" -b "FAXNUMBER: ${FAXNUMBER}\nSTATUS: ${FAXSTATUS}\nPAGES: ${FAXPAGES}\nBITRATE: ${FAXBITRATE}\nRESOLUTION: ${FAXRESOLUTION}\n\n")
 exten => h,n,Hangup
 exten => h,n(failed),System(/usr/local/bin/sendmail.py "${REPLYTO}" -a "${FAXFILE}" -f "${FROMADDR}" -s "[FAILED] ${SUBJECT}" -b "FAXNUMBER: ${FAXNUMBER}\nSTATUS: ${FAXSTATUS}\nERROR: ${FAXERROR}\n\n")
 
