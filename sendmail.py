@@ -44,13 +44,14 @@ def create_message(fromaddr, toaddr, ccaddr, subject, message, attachments):
     msg['To'] = toaddr
     msg['From'] = fromaddr
     if ccaddr:
-	msg['Cc'] = ccaddr
+        msg['Cc'] = ccaddr
     msg['Subject'] = subject
     msg['Date'] = utils.formatdate(localtime=True)
     msg['Message-ID'] = utils.make_msgid()
-    msg.attach(MIMEText(message, _subtype='plain'))
+    msg.attach(MIMEText(message, _subtype='plain', _charset='utf-8'))
     for attachment in attachments:
-	if not os.access(attachment, os.R_OK): continue
+        if not os.access(attachment, os.R_OK):
+            continue
         mimetype, _ = mimetypes.guess_type(attachment)
         if mimetype == "image/tiff":
             attachment = tif2pdf(attachment)
@@ -62,7 +63,7 @@ def send_mail(fromaddr, toaddr, ccaddr, message):
     smtp.sendmail(fromaddr, [toaddr, ccaddr], message)
     smtp.close()
 
-if __name__ == '__main__':
+def main():
     par = argparse.ArgumentParser(description=DESCRIPTION)
     par.add_argument('toaddr', help='destination address')
     par.add_argument('-a', '--attachment', nargs='*', default=[], help='attachment files')
@@ -74,3 +75,6 @@ if __name__ == '__main__':
     message = create_message(args.fromaddr, args.toaddr, args.ccaddr,
                              args.subject, args.body.decode('string-escape'), args.attachment)
     send_mail(args.fromaddr, args.toaddr, args.ccaddr, message)
+
+if __name__ == '__main__':
+    main()
