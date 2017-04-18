@@ -11,10 +11,21 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import mimetypes
 
-DESCRIPTION = "Send mail with attachment. However, TIFF format files are converted to PDF."
 TEMP_DIR = "/tmp"
-SMTP_HOST = "127.0.0.1"
+
+# localhostでSMTPサーバが稼働している場合の設定
+USE_TLS = False
+SMTP_HOST = '127.0.0.1'
 SMTP_PORT = 25
+SMTP_USER = ''
+SMTP_PASSWORD = ''
+
+# gmailを利用する場合の設定
+#USE_TLS = True
+#SMTP_HOST = 'smtp.gmail.com'
+#SMTP_PORT = 587
+#SMTP_USER = 'foo@gmail.com'
+#SMTP_PASSWORD = 'password'
 
 def attach_file(filename):
     data = open(filename, 'rb').read()
@@ -60,11 +71,14 @@ def create_message(fromaddr, toaddr, ccaddr, subject, message, attachments):
 
 def send_mail(fromaddr, toaddr, ccaddr, message):
     smtp = smtplib.SMTP(host=SMTP_HOST, port=SMTP_PORT)
+    if USE_TLS:
+        smtp.starttls()
+        smtp.login(SMTP_USER, SMTP_PASSWORD)
     smtp.sendmail(fromaddr, [toaddr, ccaddr], message)
     smtp.close()
 
 def main():
-    par = argparse.ArgumentParser(description=DESCRIPTION)
+    par = argparse.ArgumentParser(description="Send mail with attachment. However, TIFF format files are converted to PDF.")
     par.add_argument('toaddr', help='destination address')
     par.add_argument('-a', '--attachment', nargs='*', default=[], help='attachment files')
     par.add_argument('-f', '--from', default='noreply@example.com', help='sender address', dest='fromaddr')

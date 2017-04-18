@@ -72,7 +72,6 @@ FAXの送受信結果をメールで通知するためのスクリプトです�
 
 - ファイルを添付したメールを送信できます。
 - 添付ファイルがTIFF形式の場合は，PDFに変換します。
-- 同一マシン上にsmtpサーバが稼働しているものとしています。
 
 ### 必要条件
 
@@ -94,6 +93,21 @@ ImageMagickは，以下のコマンドでインストールしました。
 ```
 $ sudo apt install imagemagick
 ```
+
+### 設定
+
+デフォルトでは，同一マシン上にsmtpサーバが稼働しているものとしています。  
+gmailなど外部のSMTPサーバを利用する場合は，`sendmail.py`先頭の設定を適宜書き換えて利用してください。
+
+```python
+# gmailを利用する場合の設定
+USE_TLS = True
+SMTP_HOST = 'smtp.gmail.com'
+SMTP_PORT = 587
+SMTP_USER = 'foo@gmail.com'
+SMTP_PASSWORD = 'password'
+```
+
 ### 使い方
 
 ```
