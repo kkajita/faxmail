@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-FAX gateway for Asterisk
+Email to FAX gateway for Asterisk
 """
 
 import os

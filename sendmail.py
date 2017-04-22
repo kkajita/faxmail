@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Send mail with attachment. However, TIFF format files are converted to PDF.
+Send email with attachment while converting TIFF format to PDF.
 """
 
 import smtplib
@@ -43,7 +43,7 @@ def attach_file(filename):
         retval = MIMEBase(maintype, subtype)
         retval.set_payload(data)
         encoders.encode_base64(retval)
-    retval.add_header('Content-Disposition', 'attachment', filename=os.path.basename(filename))
+    retval.add_header('Content-Disposition', 'inline', filename=os.path.basename(filename))
     return retval
 
 def tif2pdf(tif_file):
@@ -55,8 +55,8 @@ def tif2pdf(tif_file):
     proc.communicate()
     return pdf_file
 
-def create_message(fromaddr, toaddr, ccaddr, subject, message, attachments):
-    "メッセージを組み立てる"
+def create_message(fromaddr, toaddr, ccaddr, subject, text, attachments):
+    "マルチパートMIMEメッセージを組み立てる"
     msg = MIMEMultipart()
     msg['To'] = toaddr
     msg['From'] = fromaddr
@@ -65,7 +65,7 @@ def create_message(fromaddr, toaddr, ccaddr, subject, message, attachments):
     msg['Subject'] = subject
     msg['Date'] = utils.formatdate(localtime=True)
     msg['Message-ID'] = utils.make_msgid()
-    msg.attach(MIMEText(message, _subtype='plain', _charset='utf-8'))
+    msg.attach(MIMEText(text, _subtype='plain', _charset='utf-8'))
     for attachment in attachments:
         if not os.access(attachment, os.R_OK):
             continue
