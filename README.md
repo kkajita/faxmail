@@ -10,32 +10,33 @@ PBXソフトウェアAsteriskを，FAXと電子メールのgatewayとして構�
   - FAXイメージは，PDF形式で添付されます。
 - メール経由でFAXを送信
   - 送信先電話番号は，メールアドレスの一部（例：`fax+<送信先電話番号>@example.com`）を使って指示します。
-  - メールに添付されたPDFをFAXで送信します。
+  - メールに添付されたPDF（JPEG, PNGも可）をFAXで送信します。
 
 ## sendfax.py
 
-メールに添付されたPDFのイメージをFAXで送信します。  
+メールに添付された画像イメージをFAXで送信します。  
 
-- Ghostscriptを使って，メールから抽出したPDFをTIFF形式ファイルに変換します。
-- `/var/spool/asterisk/outgoing`ディレクトリにcall fileを置くことで，
-  AsteriskにFAXの送信を指示します。
+- PDFが添付されている場合，Ghostscriptを使ってTIFF形式に変換します。
+- JPEG, PNGが添付されている場合，ImageMagickでいつたんPDFに変換してから，GhostscriptでTIFF形式に変換します。
+- `/var/spool/asterisk/outgoing`ディレクトリにcall fileを置くことで，AsteriskにFAXの送信を指示します。
 - メールヘッダから送信元（Reply-ToまたはFrom），件名（Subject）を抽出し，Asterisk側へ受け渡します。
 - 本文のテキストは無視します。
 
 ### 必要条件
 
-実行には，以下のソフトウェアが必要です。
+プログラムの実行には，以下のソフトウェアが必要です。
 
 - Python
 - Ghostscript
-- Asterisk
+- ImageMagick
 
-以下の環境で動作確認を取りました。
+以下の環境で動作確認しました。
 
 - Ubuntu 16.04
 - Python 2.7.12
 - Postfix 3.1.0
 - Ghostscript 9.18
+- ImageMagick 6.q16
 - Asterisk 13
 
 GhostscriptとAsteriskは，以下のコマンドでインストールしました。
@@ -75,13 +76,13 @@ FAXの送受信結果をメールで通知するためのスクリプトです�
 
 ### 必要条件
 
-実行には，以下のソフトウェアが必要です。
+プログラムの実行には，以下のソフトウェアが必要です。
 
 - Python
 - Postfix
 - ImageMagick
 
-以下の環境で動作確認を取りました。
+以下の環境で動作確認しました。
 
 - Ubuntu 16.04
 - Python 2.7.12
