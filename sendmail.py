@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+"""
+Send mail with attachment. However, TIFF format files are converted to PDF.
+"""
 
 import smtplib
 import os
@@ -13,14 +16,14 @@ import mimetypes
 
 TEMP_DIR = "/tmp"
 
-# localhostでSMTPサーバが稼働している場合の設定
+# localhostでSMTPサーバが稼働している場合
 USE_TLS = False
 SMTP_HOST = '127.0.0.1'
 SMTP_PORT = 25
 SMTP_USER = ''
 SMTP_PASSWORD = ''
 
-# gmailを利用する場合の設定
+# gmailを利用する場合
 #USE_TLS = True
 #SMTP_HOST = 'smtp.gmail.com'
 #SMTP_PORT = 587
@@ -28,6 +31,7 @@ SMTP_PASSWORD = ''
 #SMTP_PASSWORD = 'password'
 
 def attach_file(filename):
+    "添付ファイルのMIMEパートを作成"
     data = open(filename, 'rb').read()
     mimetype, mimeencoding = mimetypes.guess_type(filename)
     if mimeencoding or (mimetype is None):
@@ -43,6 +47,7 @@ def attach_file(filename):
     return retval
 
 def tif2pdf(tif_file):
+    "TIFFファイルをPDFファイルに変換"
     basename, _ = os.path.splitext(os.path.basename(tif_file))
     pdf_file = os.path.join(TEMP_DIR, basename + '.pdf')
     command = ['convert', tif_file, pdf_file]
@@ -51,6 +56,7 @@ def tif2pdf(tif_file):
     return pdf_file
 
 def create_message(fromaddr, toaddr, ccaddr, subject, message, attachments):
+    "メッセージを組み立てる"
     msg = MIMEMultipart()
     msg['To'] = toaddr
     msg['From'] = fromaddr
@@ -69,7 +75,8 @@ def create_message(fromaddr, toaddr, ccaddr, subject, message, attachments):
         msg.attach(attach_file(attachment))
     return msg.as_string()
 
-def send_mail(fromaddr, toaddr, ccaddr, message):
+def sendmail(fromaddr, toaddr, ccaddr, message):
+    "Eメールを送信する"
     smtp = smtplib.SMTP(host=SMTP_HOST, port=SMTP_PORT)
     if USE_TLS:
         smtp.starttls()
@@ -78,7 +85,8 @@ def send_mail(fromaddr, toaddr, ccaddr, message):
     smtp.close()
 
 def main():
-    par = argparse.ArgumentParser(description="Send mail with attachment. However, TIFF format files are converted to PDF.")
+    "コマンドライン解析"
+    par = argparse.ArgumentParser(description=__doc__)
     par.add_argument('toaddr', help='destination address')
     par.add_argument('-a', '--attachment', nargs='*', default=[], help='attachment files')
     par.add_argument('-f', '--from', default='noreply@example.com', help='sender address', dest='fromaddr')
@@ -88,7 +96,7 @@ def main():
     args = par.parse_args()
     message = create_message(args.fromaddr, args.toaddr, args.ccaddr,
                              args.subject, args.body.decode('string-escape'), args.attachment)
-    send_mail(args.fromaddr, args.toaddr, args.ccaddr, message)
+    sendmail(args.fromaddr, args.toaddr, args.ccaddr, message)
 
 if __name__ == '__main__':
     main()
