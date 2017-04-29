@@ -10,37 +10,37 @@ TEMP_DIR = '/tmp'
 TIFF_DIR = '/var/spool/asterisk/fax'
 OUTGOING_DIR = '/var/spool/asterisk/outgoing'
 
+#RESOLUTION = (204, 98)
+RESOLUTION = (204, 196)
+#RESOLUTION = (204, 392)
+
+def res_string(factor):
+    return "{0}x{1}".format(factor * RESOLUTION[0], factor * RESOLUTION[1])
+
 # 送信対象型式のデフォルト値
 # pdf, tiff, jpeg, png, html,...
 DEFAULT_SUBTYPES = ['pdf', 'html']
 
 def image2pdf_command(from_file, to_file):
-    """
-    ラスタ画像→PDF変換コマンド
-    ラスタ画像の抽出を行わない(添付画像を無視する)場合は，`return None`に変更
-    """
+    "ラスタ画像→PDF変換コマンド"
     return ['convert', from_file, to_file]
 
 def html2pdf_command(from_file, to_file):
-    """
-    HTML→PDF変換コマンド
-    HTML本文を送信しない場合は，`return None`に変更
-    """
-    #return ['xvfb-run', 'wkhtmltopdf', '--encoding', 'utf-8', '--dpi', '360', from_file, to_file]
-    #return ['xvfb-run', 'wkhtmltopdf', '--dpi', '360', from_file, to_file]
-    return ['wkhtmltopdf', '--dpi', '400', from_file, to_file]
+    "HTML→PDF変換コマンド"
+    #return ['xvfb-run', 'wkhtmltopdf', from_file, to_file]
+    return ['wkhtmltopdf', '--dpi', '360', from_file, to_file]
 
-def pdfs2tiff_command(pdf_files, tiff_file):
-    """
-    複数PDF→TIFF変換コマンド
-    - 標準 '-r204x98'
-    - ファイン '-r204x196'
-    - スーパーファイン '-r204x392'
-    """
+def raster_command(pdf_files, tiff_file):
+    "PDFラスタライズコマンド"
     return [
         'gs', '-q', '-dNOPAUSE', '-dBATCH',
-        '-sDEVICE=tiffg4', '-sPAPERSIZE=a4', '-dFIXEDMEDIA', '-dPDFFitPage', '-r204x196',
+        '-sDEVICE=tiff24nc', '-sPAPERSIZE=a4', '-dFIXEDMEDIA', '-dPDFFitPage', '-r' + res_string(2),
         '-sOutputFile='+tiff_file] + pdf_files
+
+def tofax_command(from_file, to_file):
+    "ラスタ画像二値化コマンド"
+    return ['convert', '-format', 'fax', '-density', res_string(1),
+            '-monochrome', '-type', 'Bilevel', '-despeckle', '-threshold', '80%', from_file, to_file]
 
 OUTGOING_MESSAGE = '''Channel: SIP/{faxnumber}@{trunk}
 WaitTime: 30
@@ -93,10 +93,12 @@ def extract_pdfs(message, basename, targets):
             html_file = writefile(str(root), temp_file(i, subtype))
             yield convert(html2pdf_command, html_file, temp_file(i, 'pdf'))
 
-def pdfs2tif(pdf_files, basename):
+def pdfs2fax(pdf_files, basename):
     "複数のPDFファイルをひとつのTIFFファイルに変換"
-    tif_file = os.path.join(TIFF_DIR, basename + '.tif')
-    return convert(pdfs2tiff_command, pdf_files, tif_file)
+    tiff_file = os.path.join(TEMP_DIR, basename + '.tiff')
+    fax_file = os.path.join(TIFF_DIR, basename + '.tiff')
+    convert(raster_command, pdf_files, tiff_file)
+    return convert(tofax_command, tiff_file, fax_file)
 
 def create_callfile(basename, **params):
     """
@@ -122,9 +124,9 @@ def sendfax(message, context, trunk, faxnumber):
     subject = message['Subject'] if message['Subject'] else 'Send Fax to ' + faxnumber
     subtypes = extract_subtypes(subject)
     pdf_files = [f for f in extract_pdfs(message, basename, subtypes) if f]
-    tif_file = pdfs2tif(pdf_files, basename) if pdf_files else '<<EMPTY>>'
+    fax_file = pdfs2fax(pdf_files, basename) if pdf_files else '<<EMPTY>>'
     create_callfile(basename, context=context, trunk=trunk, faxnumber=faxnumber,
-                    faxfile=tif_file, replyto=replyto, subject=subject)
+                    faxfile=fax_file, replyto=replyto, subject=subject)
 
 def main():
     "コマンドライン解析"
