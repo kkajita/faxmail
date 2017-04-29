@@ -25,7 +25,7 @@ def image2pdf_command(from_file, to_file):
 
 def html2pdf_command(from_file, to_file):
     "HTML→PDF変換コマンド"
-    return ['wkhtmltopdf', '--disable-smart-shrinking', '--dpi', '360', from_file, to_file]
+    return ['/usr/local/bin/wkhtmltopdf', '--disable-smart-shrinking', '--dpi', '360', from_file, to_file]
 
 def raster_command(quality, pdf_files, tiff_file):
     "PDFラスタライズコマンド"
