@@ -9,13 +9,11 @@ import subprocess
 TEMP_DIR = '/tmp'
 TIFF_DIR = '/var/spool/asterisk/fax'
 OUTGOING_DIR = '/var/spool/asterisk/outgoing'
-
-#RESOLUTION = (204, 98)
-RESOLUTION = (204, 196)
-#RESOLUTION = (204, 392)
-
-def res_string(factor):
-    return "{0}x{1}".format(factor * RESOLUTION[0], factor * RESOLUTION[1])
+RESOLUTIONS = {
+    'normal': '-r204x98',
+    'fine': '-r204x196',
+    'super': '-r204x392',
+}
 
 # 送信対象型式のデフォルト値
 # pdf, tiff, jpeg, png, html,...
@@ -27,20 +25,14 @@ def image2pdf_command(from_file, to_file):
 
 def html2pdf_command(from_file, to_file):
     "HTML→PDF変換コマンド"
-    #return ['xvfb-run', 'wkhtmltopdf', from_file, to_file]
-    return ['wkhtmltopdf', '--dpi', '360', from_file, to_file]
+    return ['wkhtmltopdf', '--disable-smart-shrinking', '--dpi', '360', from_file, to_file]
 
-def raster_command(pdf_files, tiff_file):
+def raster_command(quality, pdf_files, tiff_file):
     "PDFラスタライズコマンド"
     return [
         'gs', '-q', '-dNOPAUSE', '-dBATCH',
-        '-sDEVICE=tiff24nc', '-sPAPERSIZE=a4', '-dFIXEDMEDIA', '-dPDFFitPage', '-r' + res_string(2),
+        '-sDEVICE=tiffg3', '-sPAPERSIZE=a4', '-dFIXEDMEDIA', '-dPDFFitPage', RESOLUTIONS[quality],
         '-sOutputFile='+tiff_file] + pdf_files
-
-def tofax_command(from_file, to_file):
-    "ラスタ画像二値化コマンド"
-    return ['convert', '-format', 'fax', '-density', res_string(1),
-            '-monochrome', '-type', 'Bilevel', '-despeckle', '-threshold', '80%', from_file, to_file]
 
 OUTGOING_MESSAGE = '''Channel: SIP/{faxnumber}@{trunk}
 WaitTime: 30
@@ -93,12 +85,12 @@ def extract_pdfs(message, basename, targets):
             html_file = writefile(str(root), temp_file(i, subtype))
             yield convert(html2pdf_command, html_file, temp_file(i, 'pdf'))
 
-def pdfs2fax(pdf_files, basename):
+def pdfs2fax(quality, pdf_files, basename):
     "複数のPDFファイルをひとつのTIFFファイルに変換"
-    tiff_file = os.path.join(TEMP_DIR, basename + '.tiff')
+    import functools
     fax_file = os.path.join(TIFF_DIR, basename + '.tiff')
-    convert(raster_command, pdf_files, tiff_file)
-    return convert(tofax_command, tiff_file, fax_file)
+    command = functools.partial(raster_command, quality)
+    return convert(command, pdf_files, fax_file)
 
 def create_callfile(basename, **params):
     """
@@ -109,22 +101,27 @@ def create_callfile(basename, **params):
     with open(call_file, 'w') as f:
         f.write(OUTGOING_MESSAGE.format(**params))
 
-def extract_subtypes(subject):
+def extract_options(subject):
     "Subject文字列からオプションを抽出"
     import re
     plus = set(re.findall(r'\+(\w+)', subject))
     minus = set(re.findall(r'\-(\w+)', subject))
     return set(DEFAULT_SUBTYPES).union(plus).difference(minus)
 
-def sendfax(message, context, trunk, faxnumber):
+def get_quality(options, quality):
+    "Subject文字列に解像度の指示があれば差し替える"
+    setting = options.intersection(set(RESOLUTIONS.keys()))
+    return setting.pop() if setting else quality
+
+def sendfax(message, context, trunk, faxnumber, quality):
     "メールメッセージから画像を抽出して，FAX送信するようAsteriskに指示する。"
     import time
     basename = str(int(time.time()))
     replyto = message.get('Reply-To', message['From'])
     subject = message['Subject'] if message['Subject'] else 'Send Fax to ' + faxnumber
-    subtypes = extract_subtypes(subject)
-    pdf_files = [f for f in extract_pdfs(message, basename, subtypes) if f]
-    fax_file = pdfs2fax(pdf_files, basename) if pdf_files else '<<EMPTY>>'
+    options = extract_options(subject)
+    pdf_files = [f for f in extract_pdfs(message, basename, options) if f]
+    fax_file = pdfs2fax(get_quality(options, quality), pdf_files, basename) if pdf_files else '<<EMPTY>>'
     create_callfile(basename, context=context, trunk=trunk, faxnumber=faxnumber,
                     faxfile=fax_file, replyto=replyto, subject=subject)
 
@@ -134,12 +131,13 @@ def main():
     import argparse
     import email
     par = argparse.ArgumentParser(description=__doc__)
+    par.add_argument('-q', '--quality', default='fine', choices=RESOLUTIONS.keys(), help='fax resolution')
     par.add_argument('context', help='context name')
     par.add_argument('trunk', help='SIP trunk')
     par.add_argument('number', help='FAX number')
     args = par.parse_args()
     message = email.message_from_file(sys.stdin)
-    sendfax(message, args.context, args.trunk, args.number)
+    sendfax(message, args.context, args.trunk, args.number, args.quality)
 
 if __name__ == '__main__':
     main()
