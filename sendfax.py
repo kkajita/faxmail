@@ -77,7 +77,7 @@ def extract_pdfs(message, basename, targets):
         if subtype not in targets:
             continue
         data = part.get_payload(decode=True)
-        if maintype == 'applicatione' and subtype == 'pdf':
+        if maintype == 'application' and subtype == 'pdf':
             yield writefile(data, temp_file(i, 'pdf'))
         elif maintype == 'image':
             image_file = writefile(data, temp_file(i, subtype))
@@ -145,7 +145,7 @@ def main():
     par.add_argument('trunk', help='SIP trunk')
     par.add_argument('number', help='FAX number')
     par.add_argument('-q', '--quality', default='fine', choices=RESOLUTIONS.keys(), help='fax resolution')
-    par.add_argument('-t', '--types', action='append', help='content types')
+    par.add_argument('-t', '--types', default=DEFAULT_SUBTYPES, action='append', help='content types')
     args = par.parse_args()
     message = email.message_from_file(sys.stdin)
     sendfax(message, args.context, args.trunk, args.number, args.types, args.quality)
