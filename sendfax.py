@@ -60,6 +60,12 @@ def execute(args):
     proc = subprocess.Popen(args)
     proc.communicate()
 
+def decode_header(value):
+    "メールヘッダをデコード"
+    import email.header
+    values = [v[0].decode(v[1] if v[1] else 'ascii') for v in email.header.decode_header(value)]
+    return ''.join(values)
+
 def extract_pdfs(message, basename, targets):
     "メッセージから送信対象のMIMEパートを抽出してPDF形式に変換"
     def temp_file(i, ext):
@@ -73,6 +79,10 @@ def extract_pdfs(message, basename, targets):
     found_first_text = False
     for i, part in enumerate(message.walk()):
         maintype, subtype = part.get_content_maintype(), part.get_content_subtype()
+        if subtype == 'octet-stream':
+            _, ext = os.path.splitext(decode_header(part.get_filename()))
+            if ext.lower() == '.pdf':
+                subtype = 'pdf'
         if subtype not in targets:
             continue
         charset = part.get_content_charset()
