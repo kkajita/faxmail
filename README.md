@@ -1,6 +1,6 @@
 # faxmail
 
-PBXソフトウェアAsteriskを，FAXと電子メールのgatewayとして構成するためのスクリプトです。
+PBXソフトウェアAsteriskを，FAXと電子メールのgatewayとして構成するためのスクリプト集です。
 
 ## 概要
 
@@ -20,8 +20,8 @@ Asteriskと連携し，メールメッセージをFAXで送信します。
   - PDF, TIFFは，複数ページに対応します。
   - 複数の画像ファイルが添付されている場合，出現順にページを結合します。
 - メール本文のテキストをイメージ化します。
-  - デフォルトでは，本文のテキストは単に無視されます。
-  - メール本文の送信を指示すると，テキストをイメージ化して，画像と共に送信します。
+  - デフォルトでは本文のテキストは無視され，画像のみが送信されます。
+  - メール本文の送信を指示すると，テキストもイメージ化して，画像と共に送信します。
   - HTMLまたはプレーンテキストの本文に対応します。
   - テキストパートが複数存在するマルチパートメールの場合，最初のひとつのパートのみを抽出します。
 - メールヘッダから送信元（Reply-ToまたはFrom），件名（Subject）を抽出し，Asterisk側へ受け渡します。
@@ -50,18 +50,14 @@ Asteriskと連携し，メールメッセージをFAXで送信します。
 
 pipコマンドとBeautifulSoup4ライブラリのインストールは，以下のコマンドで行いました。
 
-~~~
-$ sudo apt install python-pip
-$ sudo pip install beautifulsoup4
-~~~
+    $ sudo apt install python-pip
+    $ sudo pip install beautifulsoup4
 
 GhostscriptとImageMagick，Asteriskは，以下のコマンドでインストールしました。
 
-~~~
-$ sudo apt install ghostscript
-$ sudo apt install imagemagick
-$ sudo apt install asterisk
-~~~
+    $ sudo apt install ghostscript
+    $ sudo apt install imagemagick
+    $ sudo apt install asterisk
 
 wkhtmltopdfは，<https://wkhtmltopdf.org>よりダウンロードしたバイナリイメージを使用しました。
 
@@ -90,28 +86,28 @@ optional arguments:
 - contextに，`extension.conf`で定義したコンテキスト名を指定します。
 - peerは，`sip.conf`で定義した接続先のpeer名を指定します。
 - numberでは，送信先の電話番号を指定します。
-- `--quality`オプションで，FAX送信画質を変更できます（デフォルト：fine）。
+- `--quality`オプションで，FAX送信画質を変更できます（デフォルト：`fine`）。
 - `--types`オプションで，メール本文から抽出するコンテンツの種類を追加できます（複数指定可）。
   - プレーンテキストの本文を抽出する場合，`--types plane`とします。
   - HTMLの本文を抽出する場合，`--types html`とします。
-  - `plane`と`html`を両方指示した場合，最初に出現した方を抽出します。
+  - `plane`と`html`を両方指示した場合，メールメッセージで最初に出現した方を優先します。
 
 #### 件名（Subject）でのオプションの指示
 
-以下の書式で，CONTENT種別の追加／削除を指示することができます。
+以下の書式で，抽出するCONTENT種別の追加／削除を指示することができます。
 
-```
-Subject: <件名> +<CONTENT種別> -<CONTENT種別>
-```
+    Subject: <件名> ( +<CONTENT種別> )* ( -<CONTENT種別> )*
+
+※「( 〜 )*」は，0回以上の繰り返しを示す。
 
 `+<CONTENT種別>`を指定した場合，抽出する対象のCONTENT種別を追加します。  
 `-<CONTENT種別>`を指定した場合，抽出する対象からCONTENT種別を削除します。
 
 また以下の書式で，FAX送信画質を指示することができます。
 
-```
-Subject: <件名> { +normal | +fine | +super }
-```
+    Subject: <件名> { +normal | +fine | +super }
+
+※「{ a | b }」は，選択を示す。
 
 ### 解説
 
@@ -146,9 +142,7 @@ FAXの送受信結果をメールで通知するためのスクリプトです�
 
 ImageMagickは，以下のコマンドでインストールしました。
 
-```
-$ sudo apt install imagemagick
-```
+    $ sudo apt install imagemagick
 
 ### 設定
 
@@ -248,9 +242,7 @@ exten => h,n(failed),System(/usr/local/bin/sendmail.py "${TOADDR}" -f "${FROMADD
 
 asteriskサービスを再起動します。
 
-```
-$ sudo service asterisk restart
-```
+    $ sudo service asterisk restart
 
 ## FAX送信設定
 ### postfixの設定
@@ -259,15 +251,13 @@ $ sudo service asterisk restart
 
 Postfixがfaxユーザーを認識するように，`/etc/aliases`にエントリを追加します。
 
-```
-fax:	root
+```ini
+fax: root
 ```
 
 `/etc/aliases.db`を更新します。
 
-```
-$ sudo newaliases
-```
+    $ sudo newaliases
 
 faxmailサービスを追加します。
 
@@ -293,9 +283,7 @@ transport_maps = regexp:/etc/postfix/transport.reg
 
 postfixサービスを再起動します。
 
-```
-$ sudo service postfix restart
-```
+    $ sudo service postfix restart
 
 ### Asteriskの設定
 
@@ -336,9 +324,7 @@ exten => h,n(failed),System(/usr/local/bin/sendmail.py "${REPLYTO}" -a "${FAXFIL
 
 asteriskサービスを再起動します。
 
-```
-$ sudo service asterisk restart
-```
+    $ sudo service asterisk restart
 
 ### セキュリティ対策について
 
