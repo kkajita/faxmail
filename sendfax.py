@@ -103,7 +103,8 @@ def extract_pdfs(message, basename, targets):
 def pdfs2fax(quality, pdf_files, basename):
     "複数のPDFファイルをひとつのTIFFファイルに変換"
     fax_file = os.path.join(TIFF_DIR, basename + '.tiff')
-    return execute(raster_command(quality, pdf_files, fax_file))
+    execute(raster_command(quality, pdf_files, fax_file))
+    return fax_file
 
 def create_callfile(basename, **params):
     "Asteriskに受け渡すcallfileを作成する。"
