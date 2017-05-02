@@ -5,7 +5,6 @@ Email to FAX gateway for Asterisk
 """
 import os
 import subprocess
-import functools
 
 TEMP_DIR = '/tmp'
 TIFF_DIR = '/var/spool/asterisk/fax'
@@ -32,22 +31,22 @@ Set: SUBJECT={subject}
 
 HTML_PARSER = "html.parser"
 
-# 送信対象MIMEサブタイプのデフォルト値
-# pdf, tiff, jpeg, png, html, plain
-DEFAULT_SUBTYPES = ['pdf', 'tiff', 'jpeg', 'png']
+# 送信対象CONTENTタイプ
+CONTENT_TYPES = ['pdf', 'tiff', 'jpeg', 'png', 'html', 'plain']
+DEFAULT_CONTENT_TYPES = ['pdf', 'tiff', 'jpeg', 'png']
 
 def image2pdf_command(from_file, to_file):
     "ラスタ画像→PDF変換コマンド"
     return ['convert', from_file, to_file]
 
-def plain2pdf_command(encoding, from_file, to_file):
+def plain2pdf_command(from_file, to_file):
     "テキスト→PDF変換コマンド"
     return ['wkhtmltopdf', '--disable-smart-shrinking', '--quiet', '--dpi', '384',
-            '--encoding', encoding, from_file, to_file]
+            '--encoding', 'utf-8', from_file, to_file]
 
 def html2pdf_command(from_file, to_file):
     "HTML→PDF変換コマンド"
-    return ['wkhtmltopdf', '--disable-smart-shrinking', '--dpi', '384', '--grayscale', from_file, to_file]
+    return ['wkhtmltopdf', '--disable-smart-shrinking', '--quiet', '--dpi', '288', '--grayscale', from_file, to_file]
 
 def raster_command(quality, pdf_files, tiff_file):
     "PDFラスタライズコマンド"
@@ -56,17 +55,13 @@ def raster_command(quality, pdf_files, tiff_file):
         '-sDEVICE=tiffg3', '-sPAPERSIZE=a4', '-dFIXEDMEDIA', '-dPDFFitPage', RESOLUTIONS[quality],
         '-sOutputFile='+tiff_file] + pdf_files
 
-def convert(command, from_file, to_file):
+def execute(args):
     "画像形式変換コマンドを実行"
-    args = command(from_file, to_file)
-    if args:
-        proc = subprocess.Popen(args)
-        proc.communicate()
-        return to_file
-    return None
+    proc = subprocess.Popen(args)
+    proc.communicate()
 
 def extract_pdfs(message, basename, targets):
-    "送信対象のMIMEパートを抽出してPDF形式に変換"
+    "メッセージから送信対象のMIMEパートを抽出してPDF形式に変換"
     def temp_file(i, ext):
         "一時ファイル名を生成"
         return os.path.join(TEMP_DIR, basename + str(i) + '.' + ext)
@@ -80,46 +75,51 @@ def extract_pdfs(message, basename, targets):
         if subtype not in targets:
             continue
         charset = part.get_content_charset()
-        data = part.get_payload(decode=True)
+        content = part.get_payload(decode=True)
+        src_file = temp_file(i, subtype)
+        dst_file = temp_file(i, 'pdf')
         if maintype == 'application' and subtype == 'pdf':
-            yield writefile(data, temp_file(i, 'pdf'))
+            writefile(content, dst_file)
+            yield dst_file
         elif maintype == 'image':
-            image_file = writefile(data, temp_file(i, subtype))
-            yield convert(image2pdf_command, image_file, temp_file(i, 'pdf'))
+            writefile(content, src_file)
+            execute(image2pdf_command(src_file, dst_file))
+            yield dst_file
         elif maintype == 'text' and subtype == 'plain':
-            plain_file = writefile(data, temp_file(i, 'txt'))
-            command = functools.partial(plain2pdf_command, charset)
-            yield convert(command, plain_file, temp_file(i, 'txt'))
+            src_file = temp_file(i, 'txt')
+            writefile(content.decode(charset).encode('utf-8'), src_file)
+            execute(plain2pdf_command(src_file, dst_file))
+            yield dst_file
         elif maintype == 'text' and subtype == 'html':
             from bs4 import BeautifulSoup
-            body = data.decode(charset)
+            body = content.decode(charset)
             root = BeautifulSoup(body, HTML_PARSER)
             meta = BeautifulSoup('<meta http-equiv="Content-Type" content="text/html; charset="utf-8">', HTML_PARSER)
             root.head.append(meta)
-            html_file = writefile(str(root), temp_file(i, subtype))
-            yield convert(html2pdf_command, html_file, temp_file(i, 'pdf'))
+            writefile(str(root), src_file)
+            execute(html2pdf_command(src_file, dst_file))
+            yield dst_file
 
 def pdfs2fax(quality, pdf_files, basename):
     "複数のPDFファイルをひとつのTIFFファイルに変換"
-    command = functools.partial(raster_command, quality)
     fax_file = os.path.join(TIFF_DIR, basename + '.tiff')
-    return convert(command, pdf_files, fax_file)
+    return execute(raster_command(quality, pdf_files, fax_file))
 
 def create_callfile(basename, **params):
-    """
-    Asteriskに受け渡すcallfileを作成する。
-    本来は，他のディレクトリで作成してからmoveしたほうが安全
-    """
+    "Asteriskに受け渡すcallfileを作成する。"
+    import shutil
+    temp_file = os.path.join(TEMP_DIR, basename + '.call')
     call_file = os.path.join(OUTGOING_DIR, basename + '.call')
-    with open(call_file, 'w') as f:
+    with open(temp_file, 'w') as f:
         f.write(OUTGOING_MESSAGE.format(**params))
+    shutil.move(temp_file, call_file)
 
 def extract_options(subject):
     "Subject文字列からオプションを抽出"
     import re
     plus = set(re.findall(r'\+(\w+)', subject))
     minus = set(re.findall(r'\-(\w+)', subject))
-    return set(DEFAULT_SUBTYPES).union(plus).difference(minus)
+    return set(DEFAULT_CONTENT_TYPES).union(plus).difference(minus)
 
 def get_quality(options, quality):
     "Subject文字列に解像度の指示があれば差し替える"
@@ -150,8 +150,9 @@ def main():
     par.add_argument('number', help='Phone number of fax')
     par.add_argument('-q', '--quality', default='fine', choices=RESOLUTIONS.keys(),
                      help='Image quality at fax transmission')
-    par.add_argument('-t', '--types', metavar='SUBTYPE', default=DEFAULT_SUBTYPES, action='append',
-                     help='Add MIME subtypes to extract (default: {0})'.format(",".join(DEFAULT_SUBTYPES)))
+    par.add_argument('-t', '--types', metavar='CONTENTTYPE',
+                     default=DEFAULT_CONTENT_TYPES, choices=CONTENT_TYPES, action='append',
+                     help='Add content type to extract ')
     args = par.parse_args()
     message = email.message_from_file(sys.stdin)
     sendfax(message, args.context, args.peer, args.number, args.types, args.quality)
