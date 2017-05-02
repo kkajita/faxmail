@@ -70,6 +70,7 @@ def extract_pdfs(message, basename, targets):
         with open(path, 'wb') as f:
             f.write(utf8str)
         return path
+    found_first_text = False
     for i, part in enumerate(message.walk()):
         maintype, subtype = part.get_content_maintype(), part.get_content_subtype()
         if subtype not in targets:
@@ -85,12 +86,13 @@ def extract_pdfs(message, basename, targets):
             writefile(content, src_file)
             execute(image2pdf_command(src_file, dst_file))
             yield dst_file
-        elif maintype == 'text' and subtype == 'plain':
+        elif not found_first_text and maintype == 'text' and subtype == 'plain':
             src_file = temp_file(i, 'txt')
             writefile(content.decode(charset).encode('utf-8'), src_file)
             execute(plain2pdf_command(src_file, dst_file))
+            found_first_text = True
             yield dst_file
-        elif maintype == 'text' and subtype == 'html':
+        elif not found_first_text and maintype == 'text' and subtype == 'html':
             from bs4 import BeautifulSoup
             body = content.decode(charset)
             root = BeautifulSoup(body, HTML_PARSER)
@@ -98,6 +100,7 @@ def extract_pdfs(message, basename, targets):
             root.head.append(meta)
             writefile(str(root), src_file)
             execute(html2pdf_command(src_file, dst_file))
+            found_first_text = True
             yield dst_file
 
 def pdfs2fax(quality, pdf_files, basename):
