@@ -121,9 +121,9 @@ def create_callfile(basename, **params):
 def extract_options(subject):
     "Subject文字列からオプションを抽出"
     import re
-    plus = set(re.findall(r'\+(\w+)', subject))
-    minus = set(re.findall(r'\-(\w+)', subject))
-    return set(DEFAULT_CONTENT_TYPES).union(plus).difference(minus)
+    plus = map(str.lower, re.findall(r'\+(\w+)', subject))
+    minus = map(str.lower, re.findall(r'\-(\w+)', subject))
+    return set(DEFAULT_CONTENT_TYPES).union(set(plus)).difference(set(minus))
 
 def get_quality(options, quality):
     "Subject文字列に解像度の指示があれば差し替える"
