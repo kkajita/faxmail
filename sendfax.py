@@ -40,14 +40,14 @@ def image2pdf_command(from_file, to_file):
     "ラスタ画像→PDF変換コマンド"
     return ['convert', from_file, to_file]
 
-def plain2pdf_command(dpi, encoding, from_file, to_file):
+def plain2pdf_command(encoding, from_file, to_file):
     "テキスト→PDF変換コマンド"
-    return ['wkhtmltopdf', '--disable-smart-shrinking', '--dpi', str(dpi),
+    return ['wkhtmltopdf', '--disable-smart-shrinking', '--quiet', '--dpi', '384',
             '--encoding', encoding, from_file, to_file]
 
-def html2pdf_command(dpi, from_file, to_file):
+def html2pdf_command(from_file, to_file):
     "HTML→PDF変換コマンド"
-    return ['wkhtmltopdf', '--disable-smart-shrinking', '--dpi', str(dpi), '--grayscale', from_file, to_file]
+    return ['wkhtmltopdf', '--disable-smart-shrinking', '--dpi', '384', '--grayscale', from_file, to_file]
 
 def raster_command(quality, pdf_files, tiff_file):
     "PDFラスタライズコマンド"
@@ -65,7 +65,7 @@ def convert(command, from_file, to_file):
         return to_file
     return None
 
-def extract_pdfs(message, basename, targets, dpi):
+def extract_pdfs(message, basename, targets):
     "送信対象のMIMEパートを抽出してPDF形式に変換"
     def temp_file(i, ext):
         "一時ファイル名を生成"
@@ -88,7 +88,7 @@ def extract_pdfs(message, basename, targets, dpi):
             yield convert(image2pdf_command, image_file, temp_file(i, 'pdf'))
         elif maintype == 'text' and subtype == 'plain':
             plain_file = writefile(data, temp_file(i, 'txt'))
-            command = functools.partial(plain2pdf_command, dpi, charset)
+            command = functools.partial(plain2pdf_command, charset)
             yield convert(command, plain_file, temp_file(i, 'txt'))
         elif maintype == 'text' and subtype == 'html':
             from bs4 import BeautifulSoup
@@ -97,8 +97,7 @@ def extract_pdfs(message, basename, targets, dpi):
             meta = BeautifulSoup('<meta http-equiv="Content-Type" content="text/html; charset="utf-8">', HTML_PARSER)
             root.head.append(meta)
             html_file = writefile(str(root), temp_file(i, subtype))
-            command = functools.partial(html2pdf_command, dpi)
-            yield convert(command, html_file, temp_file(i, 'pdf'))
+            yield convert(html2pdf_command, html_file, temp_file(i, 'pdf'))
 
 def pdfs2fax(quality, pdf_files, basename):
     "複数のPDFファイルをひとつのTIFFファイルに変換"
@@ -127,16 +126,16 @@ def get_quality(options, quality):
     setting = options.intersection(set(RESOLUTIONS.keys()))
     return setting.pop() if setting else quality
 
-def sendfax(message, context, peer, faxnumber, types, quality, dpi):
+def sendfax(message, context, peer, faxnumber, types, quality):
     "メールメッセージから画像を抽出して，FAX送信するようAsteriskに指示する。"
     import time
     basename = str(int(time.time()))
     replyto = message.get('Reply-To', message['From'])
     subject = message['Subject'] if message['Subject'] else 'Send Fax to ' + faxnumber
     options = extract_options(subject).union(set(types))
-    pdf_files = [f for f in extract_pdfs(message, basename, options, dpi) if f]
+    pdf_files = [f for f in extract_pdfs(message, basename, options) if f]
     fax_file = pdfs2fax(get_quality(options, quality), pdf_files, basename) if pdf_files else '<<EMPTY>>'
-    channel = faxnumber + '@' + peer if peer else faxnumber
+    channel = faxnumber + '@' + peer
     create_callfile(basename, context=context, channel=channel, faxnumber=faxnumber,
                     faxfile=fax_file, replyto=replyto, subject=subject)
 
@@ -146,17 +145,16 @@ def main():
     import argparse
     import email
     par = argparse.ArgumentParser(description=__doc__)
-    par.add_argument('context', help='Context for incomming fax')
+    par.add_argument('context', help='Context for outgoing fax')
+    par.add_argument('peer', help='SIP peer entry')
     par.add_argument('number', help='Phone number of fax')
-    par.add_argument('-p', '--peer', default=None, help='SIP peer entry')
     par.add_argument('-q', '--quality', default='fine', choices=RESOLUTIONS.keys(),
                      help='Image quality at fax transmission')
     par.add_argument('-t', '--types', metavar='SUBTYPE', default=DEFAULT_SUBTYPES, action='append',
                      help='Add MIME subtypes to extract (default: {0})'.format(",".join(DEFAULT_SUBTYPES)))
-    par.add_argument('-d', '--dpi', default=384, help='Resolution when rendering HTML (default: 384)')
     args = par.parse_args()
     message = email.message_from_file(sys.stdin)
-    sendfax(message, args.context, args.peer, args.number, args.types, args.quality, args.dpi)
+    sendfax(message, args.context, args.peer, args.number, args.types, args.quality)
 
 if __name__ == '__main__':
     main()
