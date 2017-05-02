@@ -64,7 +64,7 @@ def decode_header(value):
     "メールヘッダをデコード"
     import email.header
     values = [v[0].decode(v[1] if v[1] else 'ascii') for v in email.header.decode_header(value)]
-    return ''.join(values)
+    return ''.join(values).encode('utf-8')
 
 def extract_pdfs(message, basename, targets):
     "メッセージから送信対象のMIMEパートを抽出してPDF形式に変換"
@@ -145,7 +145,7 @@ def sendfax(message, context, peer, faxnumber, types, quality):
     import time
     basename = str(int(time.time()))
     replyto = message.get('Reply-To', message['From'])
-    subject = message['Subject'] if message['Subject'] else 'Send Fax to ' + faxnumber
+    subject = decode_header(message['Subject']) if message['Subject'] else 'Send Fax to ' + faxnumber
     options = extract_options(subject).union(set(types))
     pdf_files = [f for f in extract_pdfs(message, basename, options) if f]
     fax_file = pdfs2fax(get_quality(options, quality), pdf_files, basename) if pdf_files else '<<EMPTY>>'
