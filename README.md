@@ -1,71 +1,126 @@
-faxmail
-=======
+# faxmail
 
-PBXソフトウェアAsteriskを，FAXと電子メールのgatewayとして構成するためのスクリプトです。  
+PBXソフトウェアAsteriskを，FAXと電子メールのgatewayとして構成するためのスクリプトです。
 
 ## 概要
 
-以下が可能になります。
+以下の事が可能になります。
+
 - 受信したFAXをメールで転送
   - FAXイメージは，PDF形式で添付されます。
 - メール経由でFAXを送信
-  - 送信先電話番号は，メールアドレスの一部（例：`fax+<送信先電話番号>@example.com`）を使って指示します。
-  - メールに添付されたPDF（JPEG, PNGも可）をFAXで送信します。
+  - メール本文（HTMLまたはプレーンテキスト）と添付画像（PDF, TIFF, JPEG, PNG）をイメージ化してFAXで送信します。
 
 ## sendfax.py
 
-メールに添付された画像イメージをFAXで送信します。  
+Asteriskと連携し，メールメッセージをFAXで送信します。
 
-- PDFが添付されている場合，Ghostscriptを使ってTIFF形式に変換します。
-- JPEG, PNGが添付されている場合，ImageMagickでいつたんPDFに変換してから，GhostscriptでTIFF形式に変換します。
-- `/var/spool/asterisk/outgoing`ディレクトリにcall fileを置くことで，AsteriskにFAXの送信を指示します。
+- メールに添付されている画像ファイルを抽出して，FAXで送信可能な形式(TIFF G3)に変換します。
+  - 対応している画像形式は，PDF, TIFF, JPEG, PNGです。
+  - PDF, TIFFは，複数ページに対応します。
+  - 複数の画像ファイルが添付されている場合，出現順にページを結合します。
+- メール本文のテキストをイメージ化します。
+  - デフォルトでは，本文のテキストは単に無視されます。
+  - メール本文の送信を指示すると，テキストをイメージ化して，画像と共に送信します。
+  - HTMLまたはプレーンテキストの本文に対応します。
+  - テキストパートが複数存在するマルチパートメールの場合，最初のひとつのパートのみを抽出します。
 - メールヘッダから送信元（Reply-ToまたはFrom），件名（Subject）を抽出し，Asterisk側へ受け渡します。
-- 本文のテキストは無視します。
+  - 送信結果をメールで通知する際に，利用できます。
 
-### 必要条件
+## 必要条件
 
-プログラムの実行には，以下のソフトウェアが必要です。
+スクリプトの実行には，以下のソフトウェアが必要です。
 
 - Python
+  - beautifulsoup4
 - Ghostscript
 - ImageMagick
+- wkhtmltopdf
 
 以下の環境で動作確認しました。
 
 - Ubuntu 16.04
 - Python 2.7.12
+- beautifulsoup4 4.5.3
 - Postfix 3.1.0
 - Ghostscript 9.18
 - ImageMagick 6.q16
 - Asterisk 13
+- wkhtmltopdf 0.12.4 (with patched qt)
 
-GhostscriptとAsteriskは，以下のコマンドでインストールしました。
+pipコマンドとBeautifulSoup4ライブラリのインストールは，以下のコマンドで行いました。
 
-```
-$ sudo apt install asterisk
+~~~
+$ sudo apt install python-pip
+$ sudo pip install beautifulsoup4
+~~~
+
+GhostscriptとImageMagick，Asteriskは，以下のコマンドでインストールしました。
+
+~~~
 $ sudo apt install ghostscript
-```
+$ sudo apt install imagemagick
+$ sudo apt install asterisk
+~~~
+
+wkhtmltopdfは，<https://wkhtmltopdf.org>よりダウンロードしたバイナリイメージを使用しました。
 
 ### 使い方
 
-```
-usage: sendfax.py [-h] context trunk number
+~~~console
+usage: sendfax.py [-h] [-q {super,fine,normal}] [-t CONTENTTYPE]
+                  context peer number
 
-FAX gateway for Asterisk
+Email to FAX gateway for Asterisk
 
 positional arguments:
-  context     context name
-  trunk       SIP trunk
-  number      FAX number
+  context               Context for outgoing fax
+  peer                  SIP peer entry
+  number                Phone number of fax
 
 optional arguments:
-  -h, --help  show this help message and exit
-```
+  -h, --help            show this help message and exit
+  -q {super,fine,normal}, --quality {super,fine,normal}
+                        Image quality at fax transmission
+  -t CONTENTTYPE, --types CONTENTTYPE
+                        Add content type to extract
+~~~
 
 - メールメッセージは，標準入力から与えられるものとします。
 - contextに，`extension.conf`で定義したコンテキスト名を指定します。
-- trunkには，`sip.conf`で定義した接続先のセクション名を指定します。
-- numberで，送信先の電話番号を指定します。
+- peerは，`sip.conf`で定義した接続先のpeer名を指定します。
+- numberでは，送信先の電話番号を指定します。
+- `--quality`オプションで，FAX送信画質を変更できます（デフォルト：fine）。
+- `--types`オプションで，メール本文から抽出するコンテンツの種類を追加できます（複数指定可）。
+  - プレーンテキストの本文を抽出する場合，`--types plane`とします。
+  - HTMLの本文を抽出する場合，`--types html`とします。
+  - `plane`と`html`を両方指示した場合，最初に出現した方を抽出します。
+
+#### 件名（Subject）でのオプションの指示
+
+以下の書式で，CONTENT種別の追加／削除を指示することができます。
+
+```
+Subject: <件名> +<CONTENT種別> -<CONTENT種別>
+```
+
+`+<CONTENT種別>`を指定した場合，抽出する対象のCONTENT種別を追加します。  
+`-<CONTENT種別>`を指定した場合，抽出する対象からCONTENT種別を削除します。
+
+また以下の書式で，FAX送信画質を指示することができます。
+
+```
+Subject: <件名> { +normal | +fine | +super }
+```
+
+### 解説
+
+- JPEG, PNG画像は，ImageMagickを利用していったんPDFに変換します。
+- HTMLまたはプレーンテキスト形式のメール本文は，wkhtmltopdfでPDFに変換します。
+- 最後にGhostscriptで，複数のPDFを連結しつつTIFF形式画像に変換にします。
+- AsteriskへのFAX送信指示は，call fileを介して行います。
+  - callファイルは，`/var/spool/asterisk/outgoing`ディレクトリに作られます。
+  - tiffファイルは，`/var/spool/asterisk/fax`ディレクトリに作られます。
 
 ## sendmail.py
 
@@ -76,7 +131,7 @@ FAXの送受信結果をメールで通知するためのスクリプトです�
 
 ### 必要条件
 
-プログラムの実行には，以下のソフトウェアが必要です。
+スクリプトの実行には，以下のソフトウェアが必要です。
 
 - Python
 - Postfix
@@ -111,7 +166,7 @@ SMTP_PASSWORD = 'password'
 
 ### 使い方
 
-```
+```console
 usage: sendmail.py [-h] [-a [ATTACHMENT [ATTACHMENT ...]]] [-f FROMADDR]
                    [-c CCADDR] [-s SUBJECT] [-b BODY]
                    toaddr
@@ -139,16 +194,18 @@ optional arguments:
 ## FAX受信設定
 ### Asteriskの設定
 
-Asteriskの基本的な設定については，Asteriskのマニュアルやその他のサイトを参照してください。
+Asteriskの基本的な設定については，Asteriskのマニュアル等を参照してください。
 
-`sip.conf`では，着信時にFAXを検出できるように`faxdetect=yes`を設定してください。
+- `sip.conf`では，着信時にFAXを検出できるように`faxdetect=yes`を設定してください。
+- 外線受発信用peerを設定してください（ここでは，peer名`trunk`）。
 
 ```ini
 [general]
 faxdetect=yes
 
 [trunk]
-; SIP trunkの設定（省略）
+; 外線受発信用peer
+（省略）
 ```
 
 `extension.conf`の設定例を以下に示します。
@@ -201,21 +258,25 @@ $ sudo service asterisk restart
 ここでは，`fax+<送信先電話番号>@example.com`宛に届いたメールをFAXで送信するものとします。
 
 Postfixがfaxユーザーを認識するように，`/etc/aliases`にエントリを追加します。
+
 ```
 fax:	root
 ```
+
 `/etc/aliases.db`を更新します。
+
 ```
 $ sudo newaliases
 ```
 
 faxmailサービスを追加します。
-- userは，Asteriskサービスの実行ユーザに合わせてください。
-- `sendfax.py`コマンドのパス，context名，trunk名は，実行環境の設定に合わせてください。
+
+- userは，Asteriskサービスの実行ユーザに合わせてください（ubuntuでは`asterisk`）。
+- `sendfax.py`コマンドのパス，context名，peer名は，動作環境の設定に合わせてください。
 
 ```ini
 faxmail   unix  -       n       n       -       1       pipe
-        flags=q user=asterisk argv=/usr/local/bin/sendfax.py fax-tr trunk ${extension}
+        flags=q user=asterisk argv=/usr/local/bin/sendfax.py <context名> <peer名> ${extension}
 ```
 
 `/etc/postfix/main.cf`に，配送先リストファイルを追加します。
