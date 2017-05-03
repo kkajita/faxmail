@@ -46,7 +46,8 @@ def plain2pdf_command(from_file, to_file):
 
 def html2pdf_command(from_file, to_file):
     "HTML→PDF変換コマンド"
-    return ['wkhtmltopdf', '--disable-smart-shrinking', '--quiet', '--dpi', '288', '--grayscale', from_file, to_file]
+    return ['wkhtmltopdf', '--disable-smart-shrinking', '--quiet', '--dpi', '288',
+            '--grayscale', from_file, to_file]
 
 def raster_command(quality, pdf_files, tiff_file):
     "PDFラスタライズコマンド"
@@ -130,9 +131,9 @@ def create_callfile(basename, **params):
 def sendback(status, **params):
     "FAX画像を送り返す"
     import sendmail
-    body = OUTGOING_MESSAGE.format(**params)
-    sendmail.sendmail(params['replyto'], 'sendfax', subject="[{0}] {1}".format(status, params['subject']),
-                      body=body.encode('string-escape'), attachment=[params['faxfile']])
+    sendmail.sendmail(params['replyto'], 'sendfax',
+                      subject="[{0}] {1}".format(status, params['subject']),
+                      attachment=[params['faxfile']])
 
 def sendfax(message, subject, context, peer, number, quality, types, dry_run, error):
     "メールメッセージから画像を抽出して，FAX送信するようAsteriskに指示する。"
