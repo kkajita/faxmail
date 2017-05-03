@@ -81,6 +81,7 @@ optional arguments:
   -t CONTENTTYPE, --types CONTENTTYPE
                         Add content type to extract
   --dry-run             Send back FAX image
+  --version             show program's version number and exit
 ~~~
 
 - メールメッセージは，標準入力から与えられるものとします。
@@ -183,6 +184,7 @@ optional arguments:
   -s SUBJECT, --subject SUBJECT
                         subject of the email
   -b BODY, --body BODY  content of the email
+  --version             show program's version number and exit
 ```
 
 - BODYでは，エスケープシーケンス（'\n'等）が展開されます。

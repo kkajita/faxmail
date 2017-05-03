@@ -181,10 +181,11 @@ def main():
     import argparse
     import email
     import sys
-    par = argparse.ArgumentParser(description=__doc__)
+    par = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     par.add_argument('context', help='Context for outgoing fax')
     par.add_argument('peer', help='SIP peer entry')
     par.add_argument('number', help='Phone number of fax')
+    par.add_argument('--version', action='version', version='%(prog)s 0.1')
     add_opt_arguments(par)
     args = vars(par.parse_args())
     message = email.message_from_file(sys.stdin)
