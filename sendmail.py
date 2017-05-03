@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Send email with attachment while converting TIFF format to PDF.
+Send email with attachment
 """
-
 import smtplib
 import os
 import subprocess
@@ -88,13 +87,14 @@ def sendmail(toaddr, fromaddr, ccaddr='', subject='', body='', attachment=[]):
 
 def main():
     "コマンドライン解析"
-    par = argparse.ArgumentParser(description=__doc__)
+    par = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     par.add_argument('toaddr', help='destination address')
     par.add_argument('-f', '--from', default='noreply@example.com', help='sender address', dest='fromaddr')
     par.add_argument('-c', '--cc', default='', help='carbon copy address', dest='ccaddr')
     par.add_argument('-s', '--subject', default='', help='subject of the email')
     par.add_argument('-b', '--body', default='', help='content of the email')
     par.add_argument('-a', '--attachment', nargs='*', default=[], help='attachment files')
+    par.add_argument('--version', action='version', version='%(prog)s 0.1')
     args = vars(par.parse_args())
     sendmail(**args)
 
