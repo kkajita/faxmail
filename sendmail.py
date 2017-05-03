@@ -65,7 +65,7 @@ def create_message(fromaddr, toaddr, ccaddr, subject, text, attachments):
     msg['Subject'] = subject
     msg['Date'] = utils.formatdate(localtime=True)
     msg['Message-ID'] = utils.make_msgid()
-    msg.attach(MIMEText(text, _subtype='plain', _charset='utf-8'))
+    msg.attach(MIMEText(text, 'plain', 'utf-8'))
     for attachment in attachments:
         if not os.access(attachment, os.R_OK):
             continue
@@ -75,12 +75,14 @@ def create_message(fromaddr, toaddr, ccaddr, subject, text, attachments):
         msg.attach(attach_file(attachment))
     return msg.as_string()
 
-def sendmail(fromaddr, toaddr, ccaddr, message):
+def sendmail(toaddr, fromaddr, ccaddr='', subject='', body='', attachment=[]):
     "Eメールを送信する"
     smtp = smtplib.SMTP(host=SMTP_HOST, port=SMTP_PORT)
     if USE_TLS:
         smtp.starttls()
         smtp.login(SMTP_USER, SMTP_PASSWORD)
+    message = create_message(fromaddr, toaddr, ccaddr, subject,
+                             body.decode('string-escape'), attachment)
     smtp.sendmail(fromaddr, [toaddr, ccaddr], message)
     smtp.close()
 
@@ -88,15 +90,13 @@ def main():
     "コマンドライン解析"
     par = argparse.ArgumentParser(description=__doc__)
     par.add_argument('toaddr', help='destination address')
-    par.add_argument('-a', '--attachment', nargs='*', default=[], help='attachment files')
     par.add_argument('-f', '--from', default='noreply@example.com', help='sender address', dest='fromaddr')
     par.add_argument('-c', '--cc', default='', help='carbon copy address', dest='ccaddr')
     par.add_argument('-s', '--subject', default='', help='subject of the email')
     par.add_argument('-b', '--body', default='', help='content of the email')
-    args = par.parse_args()
-    message = create_message(args.fromaddr, args.toaddr, args.ccaddr,
-                             args.subject, args.body.decode('string-escape'), args.attachment)
-    sendmail(args.fromaddr, args.toaddr, args.ccaddr, message)
+    par.add_argument('-a', '--attachment', nargs='*', default=[], help='attachment files')
+    args = vars(par.parse_args())
+    sendmail(**args)
 
 if __name__ == '__main__':
     main()

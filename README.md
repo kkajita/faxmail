@@ -1,21 +1,21 @@
 # faxmail
 
-PBXソフトウェアAsteriskを，FAXと電子メールのgatewayとして構成するためのスクリプト集です。
+PBXソフトウェアAsteriskを，FAXとEメールのgatewayとして構成するためのスクリプト集です。
 
 ## 概要
 
 以下の事が可能になります。
 
-- 受信したFAXをメールで転送
+- 受信したFAXをEメールで転送
   - FAXイメージは，PDF形式で添付されます。
-- メール経由でFAXを送信
+- Eメール経由でFAXを送信
   - メール本文（HTMLまたはプレーンテキスト）と添付画像（PDF, TIFF, JPEG, PNG）をイメージ化してFAXで送信します。
 
 ## sendfax.py
 
-Asteriskと連携し，メールメッセージをFAXで送信します。
+Asteriskと連携し，EメールメッセージをFAXで送信します。
 
-- メールに添付されている画像ファイルを抽出して，FAXで送信可能な形式(TIFF G3)に変換します。
+- Eメールに添付されている画像ファイルを抽出して，FAXで送信可能な形式(TIFF G3)に変換します。
   - 対応している画像形式は，PDF, TIFF, JPEG, PNGです。
   - PDF, TIFFは，複数ページに対応します。
   - 複数の画像ファイルが添付されている場合，出現順にページを結合します。
@@ -64,7 +64,7 @@ wkhtmltopdfは，<https://wkhtmltopdf.org>よりダウンロードしたバイ�
 ### 使い方
 
 ~~~console
-usage: sendfax.py [-h] [-q {super,fine,normal}] [-t CONTENTTYPE]
+usage: sendfax.py [-h] [-q {super,fine,normal}] [-t CONTENTTYPE] [--dry-run]
                   context peer number
 
 Email to FAX gateway for Asterisk
@@ -80,6 +80,7 @@ optional arguments:
                         Image quality at fax transmission
   -t CONTENTTYPE, --types CONTENTTYPE
                         Add content type to extract
+  --dry-run             Send back FAX image
 ~~~
 
 - メールメッセージは，標準入力から与えられるものとします。
@@ -91,23 +92,24 @@ optional arguments:
   - プレーンテキストの本文を抽出する場合，`--types plane`とします。
   - HTMLの本文を抽出する場合，`--types html`とします。
   - `plane`と`html`を両方指示した場合，メールメッセージで最初に出現した方を優先します。
+- `--dry-run`オプションを指定すると，FAXを送信しないで，送信イメージ画像を送信元へEメールで送り返します。
 
 #### 件名（Subject）でのオプションの指示
 
-以下の書式で，抽出するCONTENT種別の追加／削除を指示することができます。
+Eメールの件名で，オプションを指定することができます。  
+Subjectの末尾に以下の書式で記述します。
 
-    Subject: <件名> ( +<CONTENT種別> )* ( -<CONTENT種別> )*
+    Subject: <件名> { <オプション> }
 
-※「( 〜 )*」は，0回以上の繰り返しを示す。
+指定できるオプションは，以下の3種類です。
 
-`+<CONTENT種別>`を指定した場合，抽出する対象のCONTENT種別を追加します。  
-`-<CONTENT種別>`を指定した場合，抽出する対象からCONTENT種別を削除します。
+- `-q`, `--quality`
+- `-t`, `--types`
+- `--dry-run`
 
-また以下の書式で，FAX送信画質を指示することができます。
+記述例：
 
-    Subject: <件名> { +normal | +fine | +super }
-
-※「{ a | b }」は，選択を示す。
+    Subject: 見積書送付の件 { -t html -q normal }
 
 ### 解説
 
@@ -120,9 +122,9 @@ optional arguments:
 
 ## sendmail.py
 
-FAXの送受信結果をメールで通知するためのスクリプトです。
+FAXの送受信結果をEメールで通知するためのスクリプトです。
 
-- ファイルを添付したメールを送信できます。
+- ファイルを添付したEメールを送信できます。
 - 添付ファイルがTIFF形式の場合は，PDFに変換します。
 
 ### 必要条件

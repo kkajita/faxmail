@@ -68,6 +68,7 @@ def decode_header(value):
 
 def extract_pdfs(message, basename, targets):
     "メッセージから送信対象のMIMEパートを抽出してPDF形式に変換"
+    import mimetypes
     def temp_file(i, ext):
         "一時ファイル名を生成"
         return os.path.join(TEMP_DIR, basename + str(i) + '.' + ext)
@@ -80,9 +81,7 @@ def extract_pdfs(message, basename, targets):
     for i, part in enumerate(message.walk()):
         maintype, subtype = part.get_content_maintype(), part.get_content_subtype()
         if subtype == 'octet-stream':
-            _, ext = os.path.splitext(decode_header(part.get_filename()))
-            if ext.lower() == '.pdf':
-                subtype = 'pdf'
+            maintype, subtype = mimetypes.guess_type(decode_header(part.get_filename()))[0].split('/')
         if subtype not in targets:
             continue
         charset = part.get_content_charset()
@@ -128,48 +127,74 @@ def create_callfile(basename, **params):
         f.write(OUTGOING_MESSAGE.format(**params))
     shutil.move(temp_file, call_file)
 
-def extract_options(subject):
-    "Subject文字列からオプションを抽出"
-    import re
-    plus = map(str.lower, re.findall(r'\+(\w+)', subject))
-    minus = map(str.lower, re.findall(r'\-(\w+)', subject))
-    return set(DEFAULT_CONTENT_TYPES).union(set(plus)).difference(set(minus))
+def sendback(status, **params):
+    "FAX画像を送り返す"
+    import sendmail
+    body = OUTGOING_MESSAGE.format(**params)
+    sendmail.sendmail(params['replyto'], 'sendfax', subject="[{0}] {1}".format(status, params['subject']),
+                      body=body.encode('string-escape'), attachment=[params['faxfile']])
 
-def get_quality(options, quality):
-    "Subject文字列に解像度の指示があれば差し替える"
-    setting = options.intersection(set(RESOLUTIONS.keys()))
-    return setting.pop() if setting else quality
-
-def sendfax(message, context, peer, faxnumber, types, quality):
+def sendfax(message, subject, context, peer, number, quality, types, dry_run, error):
     "メールメッセージから画像を抽出して，FAX送信するようAsteriskに指示する。"
     import time
     basename = str(int(time.time()))
+    pdf_files = [f for f in extract_pdfs(message, basename, types) if f]
+    fax_file = pdfs2fax(quality, pdf_files, basename) if pdf_files else '<<EMPTY>>'
     replyto = message.get('Reply-To', message['From'])
-    subject = decode_header(message['Subject']) if message['Subject'] else 'Send Fax to ' + faxnumber
-    options = extract_options(subject).union(set(types))
-    pdf_files = [f for f in extract_pdfs(message, basename, options) if f]
-    fax_file = pdfs2fax(get_quality(options, quality), pdf_files, basename) if pdf_files else '<<EMPTY>>'
-    channel = faxnumber + '@' + peer
-    create_callfile(basename, context=context, channel=channel, faxnumber=faxnumber,
-                    faxfile=fax_file, replyto=replyto, subject=subject)
+    subject = subject if subject else 'Send Fax to ' + number
+    if error:
+        sendback('ERROR', context=context, channel=number+'@'+peer, faxnumber=number,
+                 faxfile=fax_file, replyto=replyto, subject=subject)
+    elif dry_run:
+        sendback('DRY-RUN', context=context, channel=number+'@'+peer, faxnumber=number,
+                 faxfile=fax_file, replyto=replyto, subject=subject)
+    else:
+        create_callfile(basename, context=context, channel=number+'@'+peer, faxnumber=number,
+                        faxfile=fax_file, replyto=replyto, subject=subject)
 
-def main():
-    "コマンドライン解析"
-    import sys
-    import argparse
-    import email
-    par = argparse.ArgumentParser(description=__doc__)
-    par.add_argument('context', help='Context for outgoing fax')
-    par.add_argument('peer', help='SIP peer entry')
-    par.add_argument('number', help='Phone number of fax')
+def add_opt_arguments(par):
     par.add_argument('-q', '--quality', default='fine', choices=RESOLUTIONS.keys(),
                      help='Image quality at fax transmission')
     par.add_argument('-t', '--types', metavar='CONTENTTYPE',
                      default=DEFAULT_CONTENT_TYPES, choices=CONTENT_TYPES, action='append',
-                     help='Add content type to extract ')
-    args = par.parse_args()
+                     help='Add content type to extract')
+    par.add_argument('--dry-run', action='store_true', help='Send back FAX image')
+
+def extract_options(subject, default_args):
+    "Subject文字列からオプションを抽出"
+    import re
+    import shlex
+    import argparse
+    mached = re.search(r'\{(.+)\}$', subject)
+    if not mached:
+        return default_args
+    par = argparse.ArgumentParser()
+    add_opt_arguments(par)
+    args = par.parse_args(shlex.split(mached.group(1)))
+    default_args['quality'] = args.quality
+    default_args['types'] = args.types
+    default_args['dry_run'] = args.dry_run
+    return default_args
+
+def main():
+    "コマンドライン解析"
+    import argparse
+    import email
+    import sys
+    par = argparse.ArgumentParser(description=__doc__)
+    par.add_argument('context', help='Context for outgoing fax')
+    par.add_argument('peer', help='SIP peer entry')
+    par.add_argument('number', help='Phone number of fax')
+    add_opt_arguments(par)
+    args = vars(par.parse_args())
     message = email.message_from_file(sys.stdin)
-    sendfax(message, args.context, args.peer, args.number, args.types, args.quality)
+    subject = decode_header(message.get('Subject'))
+    try:
+        args = extract_options(subject, args)
+        args['error'] = False
+    except SystemExit:
+        args['error'] = True
+    sendfax(message, subject, **args)
 
 if __name__ == '__main__':
     main()
