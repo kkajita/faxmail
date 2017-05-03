@@ -68,6 +68,7 @@ def decode_header(value):
 
 def extract_pdfs(message, basename, targets):
     "メッセージから送信対象のMIMEパートを抽出してPDF形式に変換"
+    import mimetypes
     def temp_file(i, ext):
         "一時ファイル名を生成"
         return os.path.join(TEMP_DIR, basename + str(i) + '.' + ext)
@@ -80,9 +81,7 @@ def extract_pdfs(message, basename, targets):
     for i, part in enumerate(message.walk()):
         maintype, subtype = part.get_content_maintype(), part.get_content_subtype()
         if subtype == 'octet-stream':
-            _, ext = os.path.splitext(decode_header(part.get_filename()))
-            if ext.lower() == '.pdf':
-                subtype = 'pdf'
+            maintype, subtype = mimetypes.guess_type(decode_header(part.get_filename()))[0].split('/')
         if subtype not in targets:
             continue
         charset = part.get_content_charset()
