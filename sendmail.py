@@ -65,7 +65,7 @@ def create_message(fromaddr, toaddr, ccaddr, subject, text, attachments):
     msg['Subject'] = subject
     msg['Date'] = utils.formatdate(localtime=True)
     msg['Message-ID'] = utils.make_msgid()
-    msg.attach(MIMEText(text, _subtype='plain', _charset='utf-8'))
+    msg.attach(MIMEText(text, 'plain', 'utf-8'))
     for attachment in attachments:
         if not os.access(attachment, os.R_OK):
             continue
