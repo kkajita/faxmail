@@ -80,7 +80,7 @@ optional arguments:
                         Image quality at fax transmission
   -t CONTENTTYPE, --types CONTENTTYPE
                         Add content type to extract
-  --dry-run             Send back TIFF image
+  --dry-run             Send back FAX image
 ~~~
 
 - メールメッセージは，標準入力から与えられるものとします。

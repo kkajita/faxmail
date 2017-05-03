@@ -152,6 +152,14 @@ def sendfax(message, subject, context, peer, number, quality, types, dry_run, er
         create_callfile(basename, context=context, channel=number+'@'+peer, faxnumber=number,
                         faxfile=fax_file, replyto=replyto, subject=subject)
 
+def add_opt_arguments(par):
+    par.add_argument('-q', '--quality', default='fine', choices=RESOLUTIONS.keys(),
+                     help='Image quality at fax transmission')
+    par.add_argument('-t', '--types', metavar='CONTENTTYPE',
+                     default=DEFAULT_CONTENT_TYPES, choices=CONTENT_TYPES, action='append',
+                     help='Add content type to extract')
+    par.add_argument('--dry-run', action='store_true', help='Send back FAX image')
+
 def extract_options(subject, default_args):
     "Subject文字列からオプションを抽出"
     import re
@@ -161,9 +169,7 @@ def extract_options(subject, default_args):
     if not mached:
         return default_args
     par = argparse.ArgumentParser()
-    par.add_argument('-q', '--quality', default=default_args.get('quality'), choices=RESOLUTIONS.keys())
-    par.add_argument('-t', '--types', default=default_args.get('types'), choices=CONTENT_TYPES, action='append')
-    par.add_argument('--dry-run', default=default_args.get('dry_run'), action='store_true', help='Send back TIFF image')
+    add_opt_arguments(par)
     args = par.parse_args(shlex.split(mached.group(1)))
     default_args['quality'] = args.quality
     default_args['types'] = args.types
@@ -179,12 +185,7 @@ def main():
     par.add_argument('context', help='Context for outgoing fax')
     par.add_argument('peer', help='SIP peer entry')
     par.add_argument('number', help='Phone number of fax')
-    par.add_argument('-q', '--quality', default='fine', choices=RESOLUTIONS.keys(),
-                     help='Image quality at fax transmission')
-    par.add_argument('-t', '--types', metavar='CONTENTTYPE',
-                     default=DEFAULT_CONTENT_TYPES, choices=CONTENT_TYPES, action='append',
-                     help='Add content type to extract')
-    par.add_argument('--dry-run', action='store_true', help='Send back TIFF image')
+    add_opt_arguments(par)
     args = vars(par.parse_args())
     message = email.message_from_file(sys.stdin)
     subject = decode_header(message.get('Subject'))
