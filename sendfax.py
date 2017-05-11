@@ -183,10 +183,10 @@ def sendfax(message, subject, context, peer, number, quality, text, dry_run, err
 
 def add_opt_arguments(par):
     "コマンドラインとサブジェクト共通で使えるオプション"
-    par.add_argument('-q', '--quality', default='fine', choices=RESOLUTIONS.keys(),
-                     help='Image quality at fax transmission')
     par.add_argument('-t', '--text', metavar='TYPE', default=None, choices=TEXT_TYPES,
                      help='Select text type to extract (default: ignore text)')
+    par.add_argument('-q', '--quality', default='fine', choices=RESOLUTIONS.keys(),
+                     help='Image quality at fax transmission')
     par.add_argument('--dry-run', action='store_true', help='Send back FAX image')
 
 def extract_options(subject, default_args):
@@ -200,8 +200,8 @@ def extract_options(subject, default_args):
     par = argparse.ArgumentParser()
     add_opt_arguments(par)
     args = par.parse_args(shlex.split(mached.group(1)))
-    default_args['quality'] = args.quality
     default_args['text'] = args.text
+    default_args['quality'] = args.quality
     default_args['dry_run'] = args.dry_run
     return default_args
 
@@ -215,7 +215,7 @@ def main():
     par.add_argument('context', help='Context for outgoing fax')
     par.add_argument('peer', help='SIP peer entry')
     par.add_argument('number', help='Phone number of fax')
-    par.add_argument('--version', action='version', version='%(prog)s 0.1')
+    par.add_argument('--version', action='version', version='%(prog)s 0.2')
     add_opt_arguments(par)
     args = vars(par.parse_args())
     message = email.message_from_file(sys.stdin)
