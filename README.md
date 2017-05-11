@@ -22,8 +22,8 @@ Asteriskと連携し，EメールメッセージをFAXで送信します。
 - メール本文のテキストをイメージ化します。
   - デフォルトでは本文のテキストは無視され，画像のみが送信されます。
   - メール本文の送信を指示すると，テキストもイメージ化して，画像と共に送信します。
-  - HTMLまたはプレーンテキストの本文に対応します。
-  - テキストパートが複数存在するマルチパートメールの場合，最初のひとつのパートのみを抽出します。
+  - HTML, プレーンテキスト, Markdown形式のテキストに対応します。
+  - マルチパートメールの場合，最初のテキストパートを抽出します。
 - メールヘッダから送信元（Reply-ToまたはFrom），件名（Subject）を抽出し，Asterisk側へ受け渡します。
   - 送信結果をメールで通知する際に，利用できます。
 
@@ -33,6 +33,7 @@ Asteriskと連携し，EメールメッセージをFAXで送信します。
 
 - Python
   - beautifulsoup4
+  - markdown
 - Ghostscript
 - ImageMagick
 - wkhtmltopdf
@@ -52,6 +53,7 @@ pipコマンドとBeautifulSoup4ライブラリのインストールは，以下
 
     $ sudo apt install python-pip
     $ sudo pip install beautifulsoup4
+    $ sudo pip install markdown
 
 GhostscriptとImageMagick，Asteriskは，以下のコマンドでインストールしました。
 
@@ -64,7 +66,8 @@ wkhtmltopdfは，<https://wkhtmltopdf.org>よりダウンロードしたバイ�
 ### 使い方
 
 ~~~console
-usage: sendfax.py [-h] [-q {super,fine,normal}] [-t CONTENTTYPE] [--dry-run]
+usage: sendfax.py [-h] [--version] [-q {super,fine,normal}] [-t TYPE]
+                  [--dry-run]
                   context peer number
 
 Email to FAX gateway for Asterisk
@@ -76,23 +79,24 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
+  --version             show program's version number and exit
+  -t TYPE, --text TYPE  Select text type to extract (default: ignore text)
   -q {super,fine,normal}, --quality {super,fine,normal}
                         Image quality at fax transmission
-  -t CONTENTTYPE, --types CONTENTTYPE
-                        Add content type to extract
   --dry-run             Send back FAX image
-  --version             show program's version number and exit
 ~~~
 
-- メールメッセージは，標準入力から与えられるものとします。
 - contextに，`extension.conf`で定義したコンテキスト名を指定します。
 - peerは，`sip.conf`で定義した接続先のpeer名を指定します。
 - numberでは，送信先の電話番号を指定します。
+- メールメッセージは，標準入力から与えられるものとします。
+  - メッセージから添付画像を抽出してFAXとして送信します。
+- `--text`オプションでテキスト形式を指定すると，添付画像に加えてメール本文を送信対象とします。
+  - `html`を指定した場合，`Content-Type`が`text/html`のパートを抽出します。
+  - `plane`を指定した場合，`Content-Type`が`text/plain`のパートを抽出します。
+  - `markdown`を指定した場合，`Content-Type`が`text/plain`のパートを抽出し，Markdownとして解釈します。
+  - `--text`オプションを指定しない場合，メール本文は送信対象としません。
 - `--quality`オプションで，FAX送信画質を変更できます（デフォルト：`fine`）。
-- `--types`オプションで，メール本文から抽出するコンテンツの種類を追加できます（複数指定可）。
-  - プレーンテキストの本文を抽出する場合，`--types plane`とします。
-  - HTMLの本文を抽出する場合，`--types html`とします。
-  - `plane`と`html`を両方指示した場合，メールメッセージで最初に出現した方を優先します。
 - `--dry-run`オプションを指定すると，FAXを送信しないで，送信イメージ画像を送信元へEメールで送り返します。
 
 #### 件名（Subject）でのオプションの指示
@@ -104,8 +108,8 @@ Subjectの末尾に以下の書式で記述します。
 
 指定できるオプションは，以下の3種類です。
 
+- `-t`, `--text`
 - `-q`, `--quality`
-- `-t`, `--types`
 - `--dry-run`
 
 記述例：

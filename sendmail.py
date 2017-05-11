@@ -94,7 +94,7 @@ def main():
     par.add_argument('-s', '--subject', default='', help='subject of the email')
     par.add_argument('-b', '--body', default='', help='content of the email')
     par.add_argument('-a', '--attachment', nargs='*', default=[], help='attachment files')
-    par.add_argument('--version', action='version', version='%(prog)s 0.1')
+    par.add_argument('--version', action='version', version='%(prog)s 0.2')
     args = vars(par.parse_args())
     sendmail(**args)
 
