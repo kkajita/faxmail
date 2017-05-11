@@ -29,7 +29,7 @@ Set: REPLYTO={replyto}
 Set: SUBJECT={subject}
 '''
 
-HTML_TEMPLATE = """<!DOCTYPE html>
+HTML_TEMPLATE = u"""<!DOCTYPE html>
 <html>
 <head>
   <meta http-equiv="Content-Type" content="text/html"; charset="{charset}">
