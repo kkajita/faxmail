@@ -99,7 +99,7 @@ def html2pdf(src_file, dst_file):
 def markdown2html(charset, content):
     from markdown import markdown
     body = markdown(content.decode(charset), extensions=['extra', 'codehilite'])
-    return HTML_TEMPLATE.format(charset=charset, body=body)
+    return HTML_TEMPLATE.format(charset=charset, body=body).encode('utf-8')
 
 def extract_pdfs(message, basename, text):
     "メッセージから送信対象のMIMEパートを抽出してPDF形式に変換"
