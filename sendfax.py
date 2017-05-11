@@ -29,6 +29,18 @@ Set: REPLYTO={replyto}
 Set: SUBJECT={subject}
 '''
 
+HTML_TEMPLATE = """<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html"; charset="{charset}">
+  <style type="text/css">
+  </style>
+</head>
+<body>
+{body}
+</body>
+</html>"""
+
 HTML_PARSER = "html.parser"
 
 # 送信対象CONTENTタイプ
@@ -73,26 +85,21 @@ def writefile(utf8str, path):
         f.write(utf8str)
     return path
 
-def html2pdf(charset, content, src_file, dst_file):
+def insert_meta(charset, content):
     from bs4 import BeautifulSoup
     body = content.decode(charset)
     root = BeautifulSoup(body, HTML_PARSER)
-    print "### body ###", root.get_text()
-    meta = BeautifulSoup('<meta http-equiv="Content-Type" content="text/html; charset="utf-8">', HTML_PARSER)
+    meta = BeautifulSoup('<meta http-equiv="Content-Type" content="text/html"; charset="utf-8">', HTML_PARSER)
     root.head.append(meta)
-    writefile(str(root), src_file)
+    return str(root)
+
+def html2pdf(src_file, dst_file):
     execute(html2pdf_command(src_file, dst_file))
 
 def markdown2html(charset, content):
-    from markdown2 import markdown
-    body = markdown(content, extras=['fenced-code-blocks'])
-    return """<html>
-<head>
-  <meta charset="{charset}">
-  <link rel="stylesheet" type="text/css" href="github_pygments.css">
-</head>
-<body>{body}</body>
-</html>""".format(charset=charset, body=body)
+    from markdown import markdown
+    body = markdown(content, extensions=['extra', 'codehilite'])
+    return HTML_TEMPLATE.format(charset=charset, body=body)
 
 def extract_pdfs(message, basename, text):
     "メッセージから送信対象のMIMEパートを抽出してPDF形式に変換"
@@ -107,32 +114,30 @@ def extract_pdfs(message, basename, text):
             maintype, subtype = mimetypes.guess_type(decode_header(part.get_filename()))[0].split('/')
         charset = part.get_content_charset()
         content = part.get_payload(decode=True)
-        src_file = temp_file(i, subtype)
         dst_file = temp_file(i, 'pdf')
         if maintype == 'application' and subtype == 'pdf':
             writefile(content, dst_file)
             yield dst_file
         elif maintype == 'image' and subtype in IMAGE_TYPES:
-            writefile(content, src_file)
+            src_file = writefile(content, temp_file(i, subtype))
             execute(image2pdf_command(src_file, dst_file))
             yield dst_file
         if maintype != 'text' or not text or found_first_text:
             continue
-        print "###", maintype, subtype, text
         if subtype == 'plain' and text == 'plain':
-            src_file = temp_file(i, 'txt')
-            writefile(content.decode(charset).encode('utf-8'), src_file)
+            src_file = writefile(content.decode(charset).encode('utf-8'), temp_file(i, 'txt'))
             execute(plain2pdf_command(src_file, dst_file))
             found_first_text = True
             yield dst_file
         elif subtype == 'plain' and text == 'markdown':
-            src_file = temp_file(i, 'html')
-            writefile(markdown2html(charset, content), src_file)
-            html2pdf(charset, content, src_file, dst_file)
+            html = markdown2html(charset, content)
+            src_file = writefile(html, temp_file(i, 'html'))
+            html2pdf(src_file, dst_file)
             found_first_text = True
             yield dst_file
         elif subtype == 'html':
-            html2pdf(charset, content, src_file, dst_file)
+            src_file = writefile(insert_meta(charset, content), temp_file(i, 'html'))
+            html2pdf(src_file, dst_file)
             found_first_text = True
             yield dst_file
 
@@ -196,7 +201,7 @@ def extract_options(subject, default_args):
     add_opt_arguments(par)
     args = par.parse_args(shlex.split(mached.group(1)))
     default_args['quality'] = args.quality
-    default_args['types'] = args.types
+    default_args['text'] = args.text
     default_args['dry_run'] = args.dry_run
     return default_args
 
