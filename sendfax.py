@@ -98,7 +98,7 @@ def html2pdf(src_file, dst_file):
 
 def markdown2html(charset, content):
     from markdown import markdown
-    body = markdown(content, extensions=['extra', 'codehilite'])
+    body = markdown(content.decode(charset), extensions=['extra', 'codehilite'])
     return HTML_TEMPLATE.format(charset=charset, body=body)
 
 def extract_pdfs(message, basename, text):
